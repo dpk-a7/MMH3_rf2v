@@ -1192,11 +1192,11 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build Rust Backend
-FROM rust:1.85-slim-bookworm AS rust-builder
+FROM rust:1.99-slim-bookworm AS rust-builder
 WORKDIR /backend
 COPY backend-rust/Cargo.* ./
 COPY backend-rust/src ./src
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Stage 3: CUDA 13.0 Runtime + PyTorch cu130 + Rust Binary
 FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
