@@ -1,12 +1,12 @@
 # Graph Report - /home/deepak/DeepakProj/MMH3  (2026-10-17)
 
 ## Corpus Check
-- 22 files · ~45,882 words
+- 22 files · ~50,153 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 325 nodes · 634 edges · 37 communities detected
-- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 118 edges (avg confidence: 0.74)
+- 335 nodes · 663 edges · 37 communities detected
+- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 127 edges (avg confidence: 0.73)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -49,14 +49,14 @@
 - [[_COMMUNITY_Community 36|Community 36]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `run_job()` - 26 edges
-2. `run()` - 18 edges
-3. `PinnedModelRegistry` - 18 edges
+1. `run_job()` - 27 edges
+2. `PinnedModelRegistry` - 22 edges
+3. `run()` - 18 edges
 4. `RowParallelLinear` - 15 edges
 5. `ColumnParallelLinear` - 14 edges
-6. `_split_bounds()` - 12 edges
-7. `BadReference` - 12 edges
-8. `generate_video()` - 11 edges
+6. `generate_video()` - 12 edges
+7. `_split_bounds()` - 12 edges
+8. `BadReference` - 12 edges
 9. `attach_tensor_parallel()` - 11 edges
 10. `_shard_diffusion_on_cpu()` - 10 edges
 
@@ -65,26 +65,26 @@
   /home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs → /home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs
 - `run()` --calls--> `serve()`  [INFERRED]
   /home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs → /home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py
-- `A reference image, video, or audio clip failed validation.` --uses--> `PinnedModelRegistry`  [INFERRED]
-  /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py → /home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py
-- `Pack reference latents in prompt order: images, then each soundtrack before its` --uses--> `PinnedModelRegistry`  [INFERRED]
+- `ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl` --uses--> `PinnedModelRegistry`  [INFERRED]
   /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py → /home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py
 - `toBytes()` --calls--> `_mux()`  [INFERRED]
   /home/deepak/DeepakProj/MMH3/frontend/src/cryptoClient.ts → /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py
+- `flushAll()` --calls--> `emptySlots()`  [INFERRED]
+  /home/deepak/DeepakProj/MMH3/frontend/src/App.tsx → /home/deepak/DeepakProj/MMH3/frontend/src/components/ReferenceRack.tsx
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (48): AppState, AvailableModels, ControlnetConfig, detect_gpus(), dispatch(), download_output(), ensure_model_file(), EnvelopeFile (+40 more)
+Cohesion: 0.08
+Nodes (60): Exception, PinnedModelRegistry, trim_all_memory(), attach_ulysses(), _apply_controlnet(), _at(), _audio_payload(), BadReference (+52 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.09
-Nodes (47): trim_all_memory(), attach_ulysses(), _apply_controlnet(), _at(), _audio_payload(), BadReference, boot_comfy(), _call_patcher() (+39 more)
+Cohesion: 0.06
+Nodes (41): AppState, AvailableModels, check_system_gates(), ControlnetConfig, detect_gpus(), dispatch(), download_output(), ensure_model_file() (+33 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.11
-Nodes (35): attach_tensor_parallel(), _block_body(), block_sparse_attention(), _chunked_attention(), collective_abort(), ColumnParallelLinear, _dense_weight(), _gather_sequence() (+27 more)
+Cohesion: 0.14
+Nodes (31): attach_tensor_parallel(), _block_body(), block_sparse_attention(), _chunked_attention(), ColumnParallelLinear, _dense_weight(), _gather_sequence(), _head_to_seq() (+23 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.09
@@ -96,23 +96,23 @@ Nodes (19): encode_envelope(), envelope(), handshake(), sealed_error(), session_
 
 ### Community 5 - "Community 5"
 Cohesion: 0.19
-Nodes (16): basename(), Exception, PinnedModelRegistry, ComfyPinned, JobAborted, _load_clip(), _load_controlnet(), _load_unet() (+8 more)
+Nodes (12): router(), sweep_sessions(), bind_addr(), build_tls(), ephemeral_root(), main(), model_root(), run() (+4 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.24
-Nodes (13): client_thread(), coordinator(), emit(), error_frame(), follower(), init_parallel(), main(), mark_abort() (+5 more)
+Cohesion: 0.21
+Nodes (16): client_thread(), coordinator(), emit(), error_frame(), follower(), has_active_jobs(), init_parallel(), main() (+8 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.18
-Nodes (11): can_pin_bytes(), load_pinned(), _pin(), PinnedModule, Full checkpoint resident in pinned host RAM, moved stage by stage., ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned., ComfyUI-style usable VRAM budget for model weights on `device`., read_tensors() (+3 more)
+Nodes (12): basename(), collective_abort(), ParallelContext, Return the rank-0 error string when any rank failed. Collective when N>1., sync_error(), ComfyPinned, _load_clip(), _load_controlnet() (+4 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.22
-Nodes (9): flush_all(), connect_retry(), IpcClient, IpcFrame, ProgressEvent, read_frame(), sanitize_code(), write_frame() (+1 more)
+Cohesion: 0.18
+Nodes (11): can_pin_bytes(), load_pinned(), _pin(), PinnedModule, Full checkpoint resident in pinned host RAM, moved stage by stage., ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned., ComfyUI-style usable VRAM budget for model weights on `device`., read_tensors() (+3 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.36
-Nodes (2): EphemeralStorage, restrict_dir()
+Cohesion: 0.24
+Nodes (8): flush_all(), connect_retry(), IpcClient, IpcFrame, ProgressEvent, read_frame(), sanitize_code(), write_frame()
 
 ### Community 10 - "Community 10"
 Cohesion: 0.31
@@ -223,7 +223,7 @@ Cohesion: 1.0
 Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
 
 ## Knowledge Gaps
-- **48 isolated node(s):** `ProgressEvent`, `IpcFrame`, `CryptoError`, `GpuInfo`, `ModelCatalogResponse` (+43 more)
+- **49 isolated node(s):** `ProgressEvent`, `IpcFrame`, `CryptoError`, `GpuInfo`, `ModelCatalogResponse` (+44 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 13`** (2 nodes): `PanicFlushButton.tsx`, `PanicFlushButton()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -277,17 +277,17 @@ Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau =
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `basename()` connect `Community 5` to `Community 0`, `Community 7`?**
-  _High betweenness centrality (0.158) - this node is a cross-community bridge._
-- **Why does `run()` connect `Community 0` to `Community 9`, `Community 5`, `Community 6`, `Community 1`?**
-  _High betweenness centrality (0.093) - this node is a cross-community bridge._
-- **Why does `_mux()` connect `Community 1` to `Community 3`, `Community 5`?**
-  _High betweenness centrality (0.093) - this node is a cross-community bridge._
+- **Why does `basename()` connect `Community 7` to `Community 8`, `Community 1`, `Community 0`?**
+  _High betweenness centrality (0.161) - this node is a cross-community bridge._
+- **Why does `_mux()` connect `Community 0` to `Community 3`?**
+  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+- **Why does `run()` connect `Community 5` to `Community 0`, `Community 1`, `Community 6`?**
+  _High betweenness centrality (0.091) - this node is a cross-community bridge._
 - **Are the 11 inferred relationships involving `run_job()` (e.g. with `coordinator()` and `follower()`) actually correct?**
   _`run_job()` has 11 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 15 inferred relationships involving `PinnedModelRegistry` (e.g. with `Return (csv_devices, count) skipping GPUs heavily occupied by external workloads` and `JobAborted`) actually correct?**
+  _`PinnedModelRegistry` has 15 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `run()` (e.g. with `security_headers()` and `.new()`) actually correct?**
   _`run()` has 10 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 11 inferred relationships involving `PinnedModelRegistry` (e.g. with `Return (csv_devices, count) skipping GPUs heavily occupied by external workloads` and `JobAborted`) actually correct?**
-  _`PinnedModelRegistry` has 11 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `RowParallelLinear` (e.g. with `JobAborted` and `BadReference`) actually correct?**
   _`RowParallelLinear` has 6 INFERRED edges - model-reasoned connections that need verification._

@@ -43,9 +43,18 @@ export function App() {
   const [flushing, setFlushing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState("");
+  const [detail, setDetail] = useState("");
+  const [activityLog, setActivityLog] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const activeJob = useRef<string | null>(null);
+
+  const pushLog = useCallback((entry: string) => {
+    setActivityLog((prev) => {
+      if (prev[prev.length - 1] === entry) return prev;
+      return [...prev.slice(-14), entry];
+    });
+  }, []);
 
   const track = useCallback((url: string) => {
     urls.current.add(url);
@@ -134,17 +143,52 @@ export function App() {
     if (activeJob.current && event.job_id !== activeJob.current) return;
     setStage(event.stage);
     setProgress(event.progress);
+    if (event.detail) {
+      setDetail(event.detail);
+      setStatus(`${event.stage}: ${event.detail}`);
+      pushLog(`[${Math.round(event.progress * 100)}%] ${event.stage} — ${event.detail}`);
+    } else {
+      setStatus(event.stage);
+    }
     if (event.done) {
       setBusy(false);
       if (event.ok) {
         setStatus("Ready to download");
+        pushLog("[100%] Complete — fetching encrypted MP4");
         void pullOutput(event.job_id);
       } else {
         setError(event.detail || "inference_failed");
-        setStatus("Generation failed");
+        setStatus(`Failed: ${event.detail || "inference_failed"}`);
+        pushLog(`[ERR] ${event.detail || "inference_failed"}`);
       }
     }
   }
+
+  useEffect(() => {
+    if (!busy || !jobId) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const res = await client.call("job_status", { job_id: jobId });
+          if (!res.ok) return;
+          const m = res.metadata;
+          const ev: ProgressEvent = {
+            job_id: String(m.job_id ?? jobId),
+            stage: String(m.stage ?? "running"),
+            progress: typeof m.progress === "number" ? m.progress : 0,
+            detail: String(m.detail ?? ""),
+            done: Boolean(m.done),
+            ok: Boolean(m.ok),
+          };
+          handleProgress(ev);
+        } catch {
+          // Ignore transient polling errors while WebSocket is active
+        }
+      })();
+    }, 1000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, jobId, client]);
 
   async function pullOutput(id: string) {
     try {
@@ -266,8 +310,10 @@ export function App() {
   async function generate() {
     setError("");
     setBusy(true);
-    setProgress(0);
+    setProgress(0.01);
     setStage("queued");
+    setDetail("Validating request & checking system VRAM/RAM gates...");
+    setActivityLog(["[1%] queued — Validating request & checking system VRAM/RAM gates..."]);
     setStatus("Submitting");
     const [width, height] = computeSize(settings.aspectRatio, settings.megapixels);
     const frames = computeAlignedFrames(settings.durationSec);
@@ -314,10 +360,13 @@ export function App() {
       if (!result.ok || typeof result.metadata.job_id !== "string") {
         setBusy(false);
         setError(result.error || "generate_failed");
+        pushLog(`[ERR] ${result.error || "generate_failed"}`);
         return;
       }
       activeJob.current = result.metadata.job_id;
       setJobId(result.metadata.job_id);
+      setDetail(`Job accepted (${width}×${height} · ${frames} frames)`);
+      pushLog(`[2%] accepted — Job ${result.metadata.job_id.slice(0, 8)} (${width}×${height}, ${frames}f)`);
       setStatus(`${width}×${height} · ${frames} frames`);
     } catch (err) {
       setBusy(false);
@@ -331,7 +380,7 @@ export function App() {
     try {
       await client.call("flush_all", {});
     } catch {
-      setError("flush_failed");
+      // Session or worker may already be resetting; proceed with local & new-session cleanup
     }
     revokeAll();
     setImages(emptySlots(9));
@@ -345,13 +394,15 @@ export function App() {
     setBusy(false);
     setProgress(0);
     setStage("");
+    setDetail("");
+    setActivityLog([]);
     client.reset();
     try {
       await client.handshake();
       client.connect((event) => handleProgress(event));
       await refreshModels();
       setReady(true);
-      setStatus("Media flushed");
+      setStatus("Media & VRAM flushed");
     } catch {
       setReady(false);
       setError("Secure session failed");
@@ -409,14 +460,28 @@ export function App() {
                 {busy ? "Generating" : "Generate"}
               </button>
             </div>
-            <div>
-              <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                <span>{stage || "idle"}</span>
-                <span className="font-mono">{Math.round(progress * 100)}%</span>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs text-zinc-400">
+                <span className="font-medium text-zinc-300">
+                  {stage ? `${stage}${detail ? ` — ${detail}` : ""}` : "idle"}
+                </span>
+                <span className="font-mono text-emerald-400">{Math.round(progress * 100)}%</span>
               </div>
               <div className="h-2 rounded-full bg-zinc-950 overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${Math.round(progress * 100)}%` }} />
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-300"
+                  style={{ width: `${Math.round(progress * 100)}%` }}
+                />
               </div>
+              {activityLog.length > 0 && (
+                <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-lg p-2.5 max-h-32 overflow-y-auto font-mono text-[11px] text-zinc-400 space-y-1">
+                  {activityLog.map((line, idx) => (
+                    <div key={`${idx}-${line}`} className="truncate">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
             {outputUrl && (

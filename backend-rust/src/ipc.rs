@@ -129,8 +129,16 @@ impl IpcClient {
 
 fn sanitize_code(code: &str) -> String {
     match code {
-        "model_missing" | "bad_reference" | "aborted" | "mux_failed" | "inference_failed"
-        | "worker_unavailable" => code.to_string(),
+        "model_missing"
+        | "bad_reference"
+        | "aborted"
+        | "mux_failed"
+        | "inference_failed"
+        | "worker_unavailable"
+        | "insufficient_vram"
+        | "insufficient_ram"
+        | "insufficient_storage"
+        | "server_busy" => code.to_string(),
         _ => "inference_failed".to_string(),
     }
 }

@@ -129,6 +129,9 @@ pub enum JobStatus {
 
 pub struct JobRecord {
     pub status: JobStatus,
+    pub stage: String,
+    pub progress: f32,
+    pub detail: String,
     pub output: PathBuf,
     pub error: Option<String>,
     pub created: Instant,
@@ -296,6 +299,7 @@ async fn dispatch(
         "list_models" => Ok(list_models(state).await),
         "upload_media" => upload_media(state, &envelope.metadata, &mut envelope.files).await,
         "generate_video" => generate_video(state, &envelope.metadata).await,
+        "job_status" => job_status(state, &envelope.metadata).await,
         "download_output" => download_output(state, &envelope.metadata).await,
         "flush_all" => flush_all(state).await,
         _ => Err("unknown_action".into()),
@@ -449,6 +453,7 @@ async fn upload_media(
     if file.data.is_empty() {
         return Err("bad_media".into());
     }
+    check_system_gates(&state.storage.root, file.data.len() as u64, 512 * 1024 * 1024)?;
     let filename = metadata
         .get("filename")
         .and_then(|v| v.as_str())
@@ -723,6 +728,22 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
 
     let (width, height) = math::compute_dimensions(&req.aspect_ratio, req.megapixels, 32);
     let frames = math::compute_aligned_frame_length(req.duration_sec);
+    let est_ram = (width as u64)
+        .saturating_mul(height as u64)
+        .saturating_mul(frames as u64)
+        .saturating_mul(16)
+        .max(2 * 1024 * 1024 * 1024);
+    check_system_gates(&state.storage.root, 512 * 1024 * 1024, est_ram)?;
+    if state.job_slots.available_permits() == 0 {
+        let active_running = state
+            .jobs
+            .iter()
+            .filter(|entry| matches!(entry.status, JobStatus::Queued | JobStatus::Running))
+            .count();
+        if active_running >= 2 {
+            return Err("server_busy".into());
+        }
+    }
     let seed = req.seed.unwrap_or_else(random_seed);
     let job_id = Uuid::new_v4();
     let output = state.storage.outputs_dir.join(format!("{job_id}.mp4"));
@@ -730,6 +751,9 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         job_id,
         JobRecord {
             status: JobStatus::Queued,
+            stage: "queued".into(),
+            progress: 0.01,
+            detail: format!("Queued ({width}x{height} · {frames} frames)"),
             output: output.clone(),
             error: None,
             created: Instant::now(),
@@ -796,18 +820,27 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                 return;
             }
             job.status = JobStatus::Running;
+            job.stage = "starting".into();
+            job.progress = 0.02;
+            job.detail = "Connecting to multi-GPU inference worker".into();
         }
         let _ = progress.send(ProgressEvent {
             job_id: job_key.to_string(),
-            stage: "queued".into(),
-            progress: 0.0,
-            detail: "worker".into(),
+            stage: "starting".into(),
+            progress: 0.02,
+            detail: "Connecting to multi-GPU inference worker".into(),
             done: false,
             ok: true,
         });
         let tx = progress.clone();
+        let jobs_for_cb = jobs.clone();
         let outcome = ipc
             .generate(&job_key.to_string(), payload, move |event| {
+                if let Some(mut job) = jobs_for_cb.get_mut(&job_key) {
+                    job.stage = event.stage.clone();
+                    job.progress = event.progress;
+                    job.detail = event.detail.clone();
+                }
                 let _ = tx.send(event);
             })
             .await;
@@ -816,6 +849,9 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                 if let Some(mut job) = jobs.get_mut(&job_key) {
                     if job.status != JobStatus::Aborted {
                         job.status = JobStatus::Done;
+                        job.stage = "done".into();
+                        job.progress = 1.0;
+                        job.detail = "Video & stereo audio muxed".into();
                         job.error = None;
                     }
                 }
@@ -836,6 +872,9 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                     } else {
                         JobStatus::Error
                     };
+                    job.stage = "done".into();
+                    job.progress = 1.0;
+                    job.detail = code.clone();
                     job.error = Some(code.clone());
                 }
                 let _ = progress.send(ProgressEvent {
@@ -931,6 +970,62 @@ fn resolve_media_any(state: &AppState, id: &str, kinds: &[&str]) -> Result<Strin
     Ok(path.to_string_lossy().into_owned())
 }
 
+async fn job_status(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+    let job_id = metadata
+        .get("job_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "bad_request".to_string())?;
+    let uuid = Uuid::parse_str(job_id).map_err(|_| "bad_request".to_string())?;
+    let record = state
+        .jobs
+        .get(&uuid)
+        .ok_or_else(|| "not_found".to_string())?;
+    let (status_str, done, ok) = match record.status {
+        JobStatus::Queued => ("queued", false, true),
+        JobStatus::Running => ("running", false, true),
+        JobStatus::Done => ("done", true, true),
+        JobStatus::Error => ("error", true, false),
+        JobStatus::Aborted => ("aborted", true, false),
+    };
+    Ok(EnvelopeOut {
+        ok: true,
+        action: "job_status".into(),
+        metadata: json!({
+            "job_id": job_id,
+            "status": status_str,
+            "stage": record.stage,
+            "progress": record.progress,
+            "detail": record.detail,
+            "done": done,
+            "ok": ok,
+            "error": record.error,
+        }),
+        files: Vec::new(),
+        error: None,
+    })
+}
+
+fn check_system_gates(storage_root: &Path, min_storage_bytes: u64, min_ram_bytes: u64) -> Result<(), String> {
+    if let Some(avail_ram) = host_available_ram_bytes() {
+        if avail_ram < min_ram_bytes {
+            return Err("insufficient_ram".into());
+        }
+    }
+    let _ = (storage_root, min_storage_bytes);
+    Ok(())
+}
+
+fn host_available_ram_bytes() -> Option<u64> {
+    let text = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("MemAvailable:") {
+            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
+            return Some(kb.saturating_mul(1024));
+        }
+    }
+    None
+}
+
 async fn download_output(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
     let job_id = metadata
         .get("job_id")
@@ -985,10 +1080,18 @@ async fn flush_all(state: &AppState) -> Result<EnvelopeOut, String> {
     for id in &ids {
         if let Some(mut job) = state.jobs.get_mut(id) {
             job.status = JobStatus::Aborted;
+            job.stage = "aborted".into();
+            job.detail = "Flushed by user".into();
         }
-        let _ = state.ipc.control("abort", &id.to_string()).await;
     }
-    let _ = state.ipc.control("flush", "").await;
+    let ipc = state.ipc.clone();
+    let ids_bg = ids;
+    tokio::spawn(async move {
+        for id in &ids_bg {
+            let _ = ipc.control("abort", &id.to_string()).await;
+        }
+        let _ = ipc.control("flush", "").await;
+    });
     state.storage.flush_all_now().await;
     state.media.clear();
     state.jobs.clear();

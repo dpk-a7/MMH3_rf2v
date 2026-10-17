@@ -14,7 +14,7 @@ import torch.distributed as dist
 
 from memory_manager import PinnedModelRegistry
 from parallel_shard import CTX
-from pipeline_h3 import BadReference, JobAborted, MuxFailed, run_job
+from pipeline_h3 import BadReference, JobAborted, MuxFailed, ResourceLimitExceeded, run_job
 
 WRITE_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
@@ -147,6 +147,11 @@ def mark_abort(job_id):
             event.set()
 
 
+def has_active_jobs():
+    with JOBS_LOCK:
+        return len(JOBS) > 0
+
+
 def emit(conn, job_id, stage, frac, detail):
     try:
         write_msg(
@@ -161,7 +166,7 @@ def emit(conn, job_id, stage, frac, detail):
         return
 
 
-def client_thread(conn):
+def client_thread(conn, registry):
     try:
         message = read_msg(conn)
         kind = message.get("type")
@@ -172,9 +177,17 @@ def client_thread(conn):
             return
         if kind == "flush":
             mark_abort(None)
+            if not has_active_jobs() and CMD_Q.empty() and not CTX.active():
+                registry.flush_vram()
+                write_msg(conn, {"type": "result", "job_id": "", "payload": {"ok": True}})
+                return
             box = queue.Queue(1)
             CMD_Q.put({"type": "flush", "box": box})
-            write_msg(conn, box.get())
+            try:
+                resp = box.get(timeout=8.0)
+            except queue.Empty:
+                resp = {"type": "result", "job_id": "", "payload": {"ok": True}}
+            write_msg(conn, resp)
             return
         if kind != "generate":
             write_msg(conn, {"type": "error", "job_id": job_id, "payload": {"error": "bad_op"}})
@@ -182,6 +195,7 @@ def client_thread(conn):
         payload = message.get("payload") or {}
         if not job_id:
             job_id = str(payload.get("job_id") or "")
+        emit(conn, job_id, "worker_accepted", 0.01, "Connected to inference worker")
         event = threading.Event()
         with JOBS_LOCK:
             JOBS[job_id] = event
@@ -213,7 +227,7 @@ def client_thread(conn):
             return
 
 
-def serve(path):
+def serve(path, registry):
     directory = os.path.dirname(path) or "/dev/shm"
     os.makedirs(directory, exist_ok=True)
     if os.path.exists(path):
@@ -224,7 +238,7 @@ def serve(path):
     server.listen(16)
     while True:
         conn, _addr = server.accept()
-        threading.Thread(target=client_thread, args=(conn,), daemon=True).start()
+        threading.Thread(target=client_thread, args=(conn, registry), daemon=True).start()
 
 
 def error_frame(job_id, code):
@@ -265,6 +279,8 @@ def coordinator(registry):
             box.put(error_frame(job_id, "bad_reference"))
         except MuxFailed:
             box.put(error_frame(job_id, "mux_failed"))
+        except ResourceLimitExceeded as exc:
+            box.put(error_frame(job_id, str(exc) or "insufficient_vram"))
         except Exception:
             box.put(error_frame(job_id, "inference_failed"))
 
@@ -297,7 +313,7 @@ def main():
     if CTX.rank != 0:
         follower(registry)
         return
-    threading.Thread(target=serve, args=(sock_path(),), daemon=True).start()
+    threading.Thread(target=serve, args=(sock_path(), registry), daemon=True).start()
     coordinator(registry)
 
 

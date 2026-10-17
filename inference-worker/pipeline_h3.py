@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from memory_manager import PinnedModelRegistry, can_pin_bytes, vram_budget_bytes
+from memory_manager import PinnedModelRegistry, can_pin_bytes, host_ram_info, vram_budget_bytes
 from parallel_shard import (
     CTX,
     attach_tensor_parallel,
@@ -29,8 +29,52 @@ class BadReference(Exception):
     """A reference image, video, or audio clip failed validation."""
 
 
+class ResourceLimitExceeded(Exception):
+    """Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM."""
+
+
 class MuxFailed(Exception):
     """Bitexact FFmpeg muxing did not produce an output file."""
+
+
+def _ephemeral_free_bytes():
+    try:
+        stat = os.statvfs(_ephemeral_root())
+        return int(stat.f_bavail * stat.f_frsize)
+    except OSError:
+        return 16 * (1024 ** 3)
+
+
+def check_preflight_gate(width, height, frames, steps):
+    """Verify host RAM, GPU VRAM, and /app/ephemeral tmpfs headroom before allocating."""
+    avail_ram, _total_ram = host_ram_info()
+    # Estimate RGB frame buffer + audio + working tensor overhead in host RAM
+    frame_bytes = int(width) * int(height) * int(frames) * 3 * 4
+    min_ram = max(3 * (1024 ** 3), frame_bytes * 2)
+    if avail_ram < min_ram:
+        raise ResourceLimitExceeded("insufficient_ram")
+    if _ephemeral_free_bytes() < max(512 * (1024 ** 2), frame_bytes // 2):
+        raise ResourceLimitExceeded("insufficient_storage")
+    if torch.cuda.is_available():
+        try:
+            free_vram, _total_vram = torch.cuda.mem_get_info(CTX.device)
+            # Latent volume [1, 128, frames//8 + 1, height//32, width//32] + attention workspace
+            t_lat = max(1, (int(frames) // 8) + 1)
+            h_lat = max(1, int(height) // 32)
+            w_lat = max(1, int(width) // 32)
+            tokens = t_lat * h_lat * w_lat
+            world = max(1, int(getattr(CTX, "world", 1)))
+            est_workspace = max(1024 * (1024 ** 2), (tokens * 4096 * 4) // world)
+            if free_vram < min(2048 * (1024 ** 2), est_workspace):
+                torch.cuda.empty_cache()
+                free_vram, _ = torch.cuda.mem_get_info(CTX.device)
+                if free_vram < 1024 * (1024 ** 2):
+                    raise ResourceLimitExceeded("insufficient_vram")
+        except ResourceLimitExceeded:
+            raise
+        except Exception:
+            pass
+    _ = steps
 
 
 class ComfyPinned:
@@ -357,6 +401,8 @@ def run_job(payload, registry, progress, abort_event):
             raise BadReference()
         if code == "mux_failed":
             raise MuxFailed()
+        if code in ("insufficient_vram", "insufficient_ram", "insufficient_storage", "server_busy"):
+            raise ResourceLimitExceeded(code)
         raise RuntimeError(code or "inference_failed")
 
     def checkpoint():
@@ -382,6 +428,19 @@ def run_job(payload, registry, progress, abort_event):
     world = CTX.world if CTX.active() else 1
     cn_cfg = payload.get("controlnet_config") or {}
     strength = float(payload.get("lora_strength", 1.0))
+
+    report("preflight_gate", 0.02, f"Checking VRAM/RAM headroom ({width}x{height}, {frames}f, {world} GPU)")
+    gate_err = None
+    try:
+        check_preflight_gate(width, height, frames, steps)
+    except ResourceLimitExceeded as exc:
+        gate_err = str(exc) or "insufficient_vram"
+    except Exception:
+        gate_err = None
+    gate_err = sync_error(gate_err)
+    if gate_err:
+        raise_for(gate_err)
+
     identity = "|".join(
         [
             models.get("diffusion") or "",
@@ -400,15 +459,23 @@ def run_job(payload, registry, progress, abort_event):
     err = None
     loaded = {}
     try:
+        report("init_comfy", 0.03, "Initializing headless ComfyUI runtime")
         boot_comfy(root)
+        report("load_clip", 0.04, f"Loading text encoder ({models.get('clip')})")
         loaded["clip"] = registry.get_or_swap("clip", "clip", models["clip"], _load_clip)
+        checkpoint()
+        report("load_vae", 0.07, f"Loading video & audio VAEs ({models.get('video_vae')})")
         loaded["video_vae"] = registry.get_or_swap("video_vae", "vae", models["video_vae"], _load_vae)
         loaded["audio_vae"] = registry.get_or_swap("audio_vae", "vae", models["audio_vae"], _load_vae)
+        checkpoint()
+        report("load_diffusion", 0.10, f"Loading DiT backbone ({models.get('diffusion')})")
         loaded["diffusion"] = registry.get_or_swap(
             "diffusion", "diffussion", models["diffusion"], _load_unet
         )
+        checkpoint()
         active_diffusion = loaded["diffusion"]
         if mode == "turbo":
+            report("load_lora", 0.13, f"Applying 4-step Turbo LoRA ({models.get('lora')})")
             base = loaded["diffusion"]
             lora_marker = f"{models.get('diffusion')}|{models.get('lora')}|{strength:.4f}"
             lora_slot = registry.loaded_slots["lora"]
@@ -430,13 +497,16 @@ def run_job(payload, registry, progress, abort_event):
 
             loaded["lora"] = registry.get_or_swap("lora", "lora", models["lora"], _load_lora)
             active_diffusion = loaded["lora"]
+            report("shard_dit", 0.15, f"Sharding DiT across {world} GPU(s)")
             _shard_diffusion_on_cpu(active_diffusion, world)
         else:
             registry.loaded_slots["lora"]["filename"] = None
             registry.loaded_slots["lora"]["module"] = None
             registry.loaded_slots["lora"]["weights"] = None
+            report("shard_dit", 0.15, f"Sharding DiT across {world} GPU(s)")
             _shard_diffusion_on_cpu(active_diffusion, world)
         if cn_cfg.get("enabled") and models.get("controlnet"):
+            report("load_controlnet", 0.16, f"Loading ControlNet ({models.get('controlnet')})")
             loaded["controlnet"] = registry.get_or_swap(
                 "controlnet", "controlnet", models["controlnet"], _load_controlnet
             )
@@ -445,13 +515,18 @@ def run_job(payload, registry, progress, abort_event):
         err = "model_missing"
     except BadReference:
         err = "bad_reference"
+    except ResourceLimitExceeded as exc:
+        err = str(exc) or "insufficient_vram"
+    except torch.cuda.OutOfMemoryError:
+        registry.trim_all_memory()
+        err = "insufficient_vram"
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
     if err:
         raise_for(err)
 
-    report("stage1_load", 0.05, "clip_vae")
+    report("stage1_load", 0.17, "Activating Stage 1 (Qwen3-VL CLIP + VAEs) on GPU")
     err = None
     try:
         registry.activate(["clip", "video_vae", "audio_vae"], device)
@@ -460,6 +535,9 @@ def run_job(payload, registry, progress, abort_event):
         if world > 1 and not loaded["clip"].parallel:
             attach_tensor_parallel(loaded["clip"].obj, world, CTX.rank)
             loaded["clip"].parallel = True
+    except torch.cuda.OutOfMemoryError:
+        registry.trim_all_memory()
+        err = "insufficient_vram"
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
@@ -471,10 +549,12 @@ def run_job(payload, registry, progress, abort_event):
     latent = None
     err = None
     try:
+        report("stage1_encode", 0.19, "Encoding prompt & multimodal references (Stage 1)")
         positive, latent = _stage1_condition(
             loaded, payload, width, height, frames, ref_mode, device
         )
         if "controlnet" in loaded and cn_cfg.get("path"):
+            report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
             registry.activate(["controlnet"], device)
             positive = _apply_controlnet(
                 positive, loaded["controlnet"].obj, loaded["video_vae"].obj, cn_cfg, frames, height, width, device
@@ -484,12 +564,15 @@ def run_job(payload, registry, progress, abort_event):
         err = "bad_reference"
     except ValueError:
         err = "bad_reference"
+    except torch.cuda.OutOfMemoryError:
+        registry.trim_all_memory()
+        err = "insufficient_vram"
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
     if err:
         raise_for(err)
-    report("stage1_encode", 0.2, "condition")
+    report("stage1_offload", 0.24, "Offloading Stage 1 encoders to pinned RAM")
     err = None
     try:
         registry.offload(["clip", "video_vae", "audio_vae"])
@@ -498,10 +581,9 @@ def run_job(payload, registry, progress, abort_event):
     err = sync_error(err)
     if err:
         raise_for(err)
-    report("stage1_offload", 0.24, "pinned")
     checkpoint()
 
-    report("stage2_load", 0.28, "dit")
+    report("stage2_load", 0.27, "Activating Stage 2 DiT backbone on GPU")
     stage2 = ["lora" if mode == "turbo" else "diffusion"]
     if "controlnet" in loaded:
         stage2.append("controlnet")
@@ -518,6 +600,9 @@ def run_job(payload, registry, progress, abort_event):
         _reset_steps(_dit(runner.obj), steps)
     except BadReference:
         err = "bad_reference"
+    except torch.cuda.OutOfMemoryError:
+        registry.trim_all_memory()
+        err = "insufficient_vram"
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
@@ -532,6 +617,9 @@ def run_job(payload, registry, progress, abort_event):
         )
     except JobAborted:
         err = "aborted"
+    except torch.cuda.OutOfMemoryError:
+        registry.trim_all_memory()
+        err = "insufficient_vram"
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
@@ -539,16 +627,16 @@ def run_job(payload, registry, progress, abort_event):
         raise_for(err)
     err = None
     try:
+        report("stage2_offload", 0.86, "Offloading Stage 2 DiT to pinned RAM")
         registry.offload(stage2)
     except Exception:
         err = "inference_failed"
     err = sync_error(err)
     if err:
         raise_for(err)
-    report("stage2_offload", 0.86, "latent")
     checkpoint()
 
-    report("stage3_decode", 0.9, "vae")
+    report("stage3_decode", 0.90, "Decoding joint AV latents (Stage 3 Video FP16 + Audio FP32)")
     err = None
     frames_rgb = None
     waveform = None
