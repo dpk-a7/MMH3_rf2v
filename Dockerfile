@@ -30,6 +30,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     STATIC_DIR=/app/static \
     EPHEMERAL_DIR=/app/ephemeral \
     IPC_SOCK=/dev/shm/minimax_h3.sock \
+    CUDA_DEVICE_ORDER=PCI_BUS_ID \
     RUST_LOG=off \
     RUST_BACKTRACE=0
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -60,4 +61,5 @@ COPY inference-worker/ /app/inference-worker/
 RUN mkdir -p /app/model/diffussion /app/model/lora /app/model/controlnet /app/model/clip /app/model/vae \
     && chmod 0755 /app/minimax-h3-backend
 
-ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /app/ephemeral/uploads /app/ephemeral/outputs /tmp/cache /tmp/torch && chmod 0700 /app/ephemeral /app/ephemeral/uploads /app/ephemeral/outputs && GPU_CFG=$(python3 -c 'import sys; sys.path.insert(0, \"/app/inference-worker\"); import worker_daemon; devs, n = worker_daemon.select_optimal_gpus(); print(f\"{devs} {n}\")' 2>/dev/null || echo '0 1') && SEL_DEVS=$(echo \"$GPU_CFG\" | awk '{print $1}') && NGPU=$(echo \"$GPU_CFG\" | awk '{print $2}') && CUDA_VISIBLE_DEVICES=$SEL_DEVS torchrun --standalone --nproc_per_node=$NGPU /app/inference-worker/worker_daemon.py >/dev/null 2>&1 & exec /app/minimax-h3-backend >/dev/null 2>&1"]
+# One worker process places whole models on GPUs (see Specs.md §4.2) and is restarted if it ever dies.
+ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /app/ephemeral/uploads /app/ephemeral/outputs /tmp/cache /tmp/torch && chmod 0700 /app/ephemeral /app/ephemeral/uploads /app/ephemeral/outputs && (while true; do python3 /app/inference-worker/worker_daemon.py >/dev/null 2>&1; sleep 3; done) & exec /app/minimax-h3-backend >/dev/null 2>&1"]

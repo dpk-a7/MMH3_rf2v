@@ -13,14 +13,16 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    ipc: host
+    # Hard RAM ceiling so a runaway job is OOM-killed inside the container, never the host.
+    mem_limit: ${MMH3_MEM_LIMIT:-100g}
+    memswap_limit: ${MMH3_MEM_LIMIT:-100g}
     ulimits:
       memlock: -1
       stack: 67108864
     read_only: true
     tmpfs:
       - /tmp:size=4G,mode=1777
-      - /dev/shm:size=32G,mode=1777
+      - /dev/shm:size=16G,mode=1777
       - /app/ephemeral:size=32G,mode=0700
     volumes:
       - ./model/diffussion:/app/model/diffussion:ro
@@ -46,7 +48,8 @@ services:
       - XDG_CACHE_HOME=/tmp/cache
       - TORCH_HOME=/tmp/torch
       - HF_HOME=/tmp/hf
-      - NCCL_IB_DISABLE=1
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+      - MMH3_MIN_FREE_VRAM_GB=${MMH3_MIN_FREE_VRAM_GB:-6}
     ports:
       - "8443:8443"
     restart: unless-stopped

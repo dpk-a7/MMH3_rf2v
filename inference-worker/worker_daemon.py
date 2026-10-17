@@ -10,11 +10,9 @@ os.environ.setdefault("PYTHONWARNINGS", "ignore")
 
 import msgpack
 import torch
-import torch.distributed as dist
 
-from memory_manager import PinnedModelRegistry
-from parallel_shard import CTX
-from pipeline_h3 import BadReference, JobAborted, MuxFailed, ResourceLimitExceeded, run_job
+from memory_manager import ModelRegistry, ResourceLimitExceeded
+from pipeline_h3 import BadReference, JobAborted, MuxFailed, run_job
 
 WRITE_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
@@ -23,15 +21,9 @@ CMD_Q = queue.Queue()
 MAX_FRAME = 64 * 1024 * 1024
 
 
-def init_parallel():
-    world = int(os.environ.get("WORLD_SIZE", "1"))
-    rank = int(os.environ.get("RANK", "0"))
-    local = int(os.environ.get("LOCAL_RANK", str(rank)))
-    CTX.rank = rank
-    CTX.world = world
-    CTX.local_rank = local
+def init_runtime():
     cores = os.cpu_count() or 8
-    threads = max(2, min(16, cores // max(1, world * 2)))
+    threads = max(4, min(16, cores // 2))
     for env_key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
         os.environ.setdefault(env_key, str(threads))
     try:
@@ -39,30 +31,11 @@ def init_parallel():
     except Exception:
         pass
     if torch.cuda.is_available():
-        torch.cuda.set_device(local)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
-        if hasattr(torch.backends.cuda.matmul, "allow_fp16_reduced_precision_reduction"):
-            torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = True
-        if hasattr(torch.backends.cuda.matmul, "allow_bf16_reduced_precision_reduction"):
-            torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = True
         if hasattr(torch, "set_float32_matmul_precision"):
             torch.set_float32_matmul_precision("high")
-        for sdp_fn in ("enable_flash_sdp", "enable_mem_efficient_sdp", "enable_math_sdp"):
-            fn = getattr(torch.backends.cuda, sdp_fn, None)
-            if callable(fn):
-                fn(True)
-        CTX.device = torch.device(f"cuda:{local}")
-    else:
-        CTX.device = torch.device("cpu")
-    if world > 1 and torch.cuda.is_available():
-        dist.init_process_group(backend="nccl")
-    elif world > 1:
-        CTX.world = 1
-        CTX.rank = 0
-        if rank != 0:
-            raise SystemExit(0)
 
 
 def resolve_model_root():
@@ -71,40 +44,7 @@ def resolve_model_root():
         return env
     if os.path.isdir("/app/model"):
         return "/app/model"
-    here = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "model"))
-    return here
-
-
-def select_optimal_gpus():
-    """Return (csv_devices, count) skipping GPUs heavily occupied by external workloads."""
-    preset = (os.environ.get("CUDA_VISIBLE_DEVICES") or "").strip()
-    if preset and preset.lower() not in ("all", "none", "-1"):
-        devs = [d.strip() for d in preset.split(",") if d.strip()]
-        if devs:
-            return ",".join(devs), len(devs)
-    import subprocess
-
-    rows = []
-    try:
-        proc = subprocess.run(
-            ["nvidia-smi", "--query-gpu=index,memory.total,memory.free", "--format=csv,noheader,nounits"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        for line in proc.stdout.decode("ascii", "ignore").splitlines():
-            parts = [p.strip() for p in line.split(",")]
-            if len(parts) >= 3:
-                rows.append((parts[0], float(parts[1]), float(parts[2])))
-    except Exception:
-        rows = []
-    if not rows:
-        return "0", 1
-    healthy = [idx for idx, total, free in rows if free >= max(8192.0, total * 0.40)]
-    if healthy:
-        return ",".join(healthy), len(healthy)
-    best = max(rows, key=lambda item: item[2])[0]
-    return str(best), 1
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "model"))
 
 
 def sock_path():
@@ -147,11 +87,6 @@ def mark_abort(job_id):
             event.set()
 
 
-def has_active_jobs():
-    with JOBS_LOCK:
-        return len(JOBS) > 0
-
-
 def emit(conn, job_id, stage, frac, detail):
     try:
         write_msg(
@@ -166,7 +101,7 @@ def emit(conn, job_id, stage, frac, detail):
         return
 
 
-def client_thread(conn, registry):
+def client_thread(conn):
     try:
         message = read_msg(conn)
         kind = message.get("type")
@@ -177,17 +112,8 @@ def client_thread(conn, registry):
             return
         if kind == "flush":
             mark_abort(None)
-            if not has_active_jobs() and CMD_Q.empty() and not CTX.active():
-                registry.flush_vram()
-                write_msg(conn, {"type": "result", "job_id": "", "payload": {"ok": True}})
-                return
-            box = queue.Queue(1)
-            CMD_Q.put({"type": "flush", "box": box})
-            try:
-                resp = box.get(timeout=8.0)
-            except queue.Empty:
-                resp = {"type": "result", "job_id": "", "payload": {"ok": True}}
-            write_msg(conn, resp)
+            CMD_Q.put({"type": "flush", "box": None})
+            write_msg(conn, {"type": "result", "job_id": "", "payload": {"ok": True}})
             return
         if kind != "generate":
             write_msg(conn, {"type": "error", "job_id": job_id, "payload": {"error": "bad_op"}})
@@ -200,16 +126,7 @@ def client_thread(conn, registry):
         with JOBS_LOCK:
             JOBS[job_id] = event
         box = queue.Queue(1)
-        CMD_Q.put(
-            {
-                "type": "generate",
-                "payload": payload,
-                "box": box,
-                "conn": conn,
-                "event": event,
-                "job_id": job_id,
-            }
-        )
+        CMD_Q.put({"type": "generate", "payload": payload, "box": box, "conn": conn, "event": event, "job_id": job_id})
         try:
             write_msg(conn, box.get())
         finally:
@@ -227,7 +144,7 @@ def client_thread(conn, registry):
             return
 
 
-def serve(path, registry):
+def serve(path):
     directory = os.path.dirname(path) or "/dev/shm"
     os.makedirs(directory, exist_ok=True)
     if os.path.exists(path):
@@ -238,39 +155,39 @@ def serve(path, registry):
     server.listen(16)
     while True:
         conn, _addr = server.accept()
-        threading.Thread(target=client_thread, args=(conn, registry), daemon=True).start()
+        threading.Thread(target=client_thread, args=(conn,), daemon=True).start()
 
 
 def error_frame(job_id, code):
     return {"type": "error", "job_id": job_id, "payload": {"error": code}}
 
 
+def _is_oom(exc):
+    return isinstance(exc, torch.cuda.OutOfMemoryError) or "out of memory" in str(exc).lower()
+
+
 def coordinator(registry):
+    """Runs generate and flush commands strictly one at a time."""
     while True:
         cmd = CMD_Q.get()
-        if CTX.active():
-            dist.broadcast_object_list(
-                [{"type": cmd["type"], "payload": cmd.get("payload")}],
-                src=0,
-            )
-        box = cmd["box"]
-        job_id = cmd.get("job_id") or ""
-        try:
-            if cmd["type"] == "generate":
-                payload = cmd["payload"]
-                job_id = str(payload.get("job_id") or job_id)
-
-                def _progress(stage, frac, detail, _conn=cmd.get("conn"), _job=job_id):
-                    if _conn is not None:
-                        emit(_conn, _job, stage, frac, detail)
-
-                run_job(payload, registry, _progress, cmd.get("event"))
-                box.put({"type": "result", "job_id": job_id, "payload": {"ok": True}})
-            elif cmd["type"] == "flush":
+        if cmd["type"] == "flush":
+            try:
                 registry.flush_vram()
-                box.put({"type": "result", "job_id": "", "payload": {"ok": True}})
-            else:
-                box.put(error_frame(job_id, "bad_op"))
+            except Exception:
+                pass
+            continue
+        box = cmd["box"]
+        job_id = str((cmd.get("payload") or {}).get("job_id") or cmd.get("job_id") or "")
+        if cmd["event"].is_set():
+            box.put(error_frame(job_id, "aborted"))
+            continue
+
+        def _progress(stage, frac, detail, _conn=cmd.get("conn"), _job=job_id):
+            emit(_conn, _job, stage, frac, detail)
+
+        try:
+            run_job(cmd["payload"], registry, _progress, cmd["event"])
+            box.put({"type": "result", "job_id": job_id, "payload": {"ok": True}})
         except JobAborted:
             box.put(error_frame(job_id, "aborted"))
         except FileNotFoundError:
@@ -281,39 +198,23 @@ def coordinator(registry):
             box.put(error_frame(job_id, "mux_failed"))
         except ResourceLimitExceeded as exc:
             box.put(error_frame(job_id, str(exc) or "insufficient_vram"))
-        except Exception:
-            box.put(error_frame(job_id, "inference_failed"))
-
-
-def follower(registry):
-    while True:
-        holder = [None]
-        dist.broadcast_object_list(holder, src=0)
-        cmd = holder[0] or {}
-        kind = cmd.get("type")
-        try:
-            if kind == "generate":
-                run_job(cmd.get("payload") or {}, registry, None, None)
-            elif kind == "flush":
-                registry.flush_vram()
-        except Exception:
-            continue
+        except Exception as exc:
+            if _is_oom(exc):
+                registry.trim_all_memory()
+                box.put(error_frame(job_id, "insufficient_vram"))
+            else:
+                box.put(error_frame(job_id, "inference_failed"))
 
 
 def main():
     try:
-        null_out = open(os.devnull, "w", encoding="utf-8")
-        null_err = open(os.devnull, "w", encoding="utf-8")
-        sys.stdout = null_out
-        sys.stderr = null_err
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
     except OSError:
         pass
-    init_parallel()
-    registry = PinnedModelRegistry(resolve_model_root())
-    if CTX.rank != 0:
-        follower(registry)
-        return
-    threading.Thread(target=serve, args=(sock_path(), registry), daemon=True).start()
+    init_runtime()
+    registry = ModelRegistry(resolve_model_root())
+    threading.Thread(target=serve, args=(sock_path(),), daemon=True).start()
     coordinator(registry)
 
 

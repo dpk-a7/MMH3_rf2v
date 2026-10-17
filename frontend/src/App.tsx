@@ -377,10 +377,11 @@ export function App() {
   async function flushAll() {
     setFlushing(true);
     setError("");
+    let flushError = "";
     try {
       await client.call("flush_all", {});
-    } catch {
-      // Session or worker may already be resetting; proceed with local & new-session cleanup
+    } catch (err) {
+      flushError = err instanceof Error ? err.message : "flush_failed";
     }
     revokeAll();
     setImages(emptySlots(9));
@@ -402,7 +403,12 @@ export function App() {
       client.connect((event) => handleProgress(event));
       await refreshModels();
       setReady(true);
-      setStatus("Media & VRAM flushed");
+      if (flushError) {
+        setError(`Server flush failed (${flushError}); local media cleared and session reset`);
+        setStatus("Flush incomplete");
+      } else {
+        setStatus("Media & VRAM flushed");
+      }
     } catch {
       setReady(false);
       setError("Secure session failed");

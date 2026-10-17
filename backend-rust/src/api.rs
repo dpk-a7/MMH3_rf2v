@@ -453,7 +453,12 @@ async fn upload_media(
     if file.data.is_empty() {
         return Err("bad_media".into());
     }
-    check_system_gates(&state.storage.root, file.data.len() as u64, 512 * 1024 * 1024)?;
+    let upload_len = file.data.len() as u64;
+    check_system_gates(
+        &state.storage.root,
+        upload_len + 64 * 1024 * 1024,
+        upload_len + 2 * 1024 * 1024 * 1024,
+    )?;
     let filename = metadata
         .get("filename")
         .and_then(|v| v.as_str())
@@ -733,7 +738,11 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         .saturating_mul(frames as u64)
         .saturating_mul(16)
         .max(2 * 1024 * 1024 * 1024);
-    check_system_gates(&state.storage.root, 512 * 1024 * 1024, est_ram)?;
+    let est_output = (width as u64)
+        .saturating_mul(height as u64)
+        .saturating_mul(frames as u64)
+        / 16;
+    check_system_gates(&state.storage.root, est_output.max(512 * 1024 * 1024), est_ram)?;
     if state.job_slots.available_permits() == 0 {
         let active_running = state
             .jobs
@@ -1011,19 +1020,46 @@ fn check_system_gates(storage_root: &Path, min_storage_bytes: u64, min_ram_bytes
             return Err("insufficient_ram".into());
         }
     }
-    let _ = (storage_root, min_storage_bytes);
-    Ok(())
+    match storage_free_bytes(storage_root) {
+        Some(free) if free >= min_storage_bytes => Ok(()),
+        _ => Err("insufficient_storage".into()),
+    }
 }
 
+fn storage_free_bytes(root: &Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = std::ffi::CString::new(root.as_os_str().as_bytes()).ok()?;
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    // SAFETY: `path` is a valid NUL-terminated string and `stat` is a writable statvfs.
+    if unsafe { libc::statvfs(path.as_ptr(), &mut stat) } != 0 {
+        return None;
+    }
+    Some((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
+}
+
+/// MemAvailable, capped by the container's cgroup-v2 limit (tmpfs uploads are charged there too).
 fn host_available_ram_bytes() -> Option<u64> {
     let text = std::fs::read_to_string("/proc/meminfo").ok()?;
-    for line in text.lines() {
-        if let Some(rest) = line.strip_prefix("MemAvailable:") {
-            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
-            return Some(kb.saturating_mul(1024));
-        }
-    }
-    None
+    let host = text.lines().find_map(|line| {
+        let rest = line.strip_prefix("MemAvailable:")?;
+        rest.split_whitespace().next()?.parse::<u64>().ok()
+    })?;
+    let host = host.saturating_mul(1024);
+    Some(cgroup_available_ram_bytes().map_or(host, |cg| cg.min(host)))
+}
+
+fn cgroup_available_ram_bytes() -> Option<u64> {
+    let read = |name: &str| std::fs::read_to_string(format!("/sys/fs/cgroup/{name}")).ok();
+    let limit: u64 = read("memory.max")?.trim().parse().ok()?;
+    let current: u64 = read("memory.current")?.trim().parse().ok()?;
+    let reclaimable: u64 = read("memory.stat")
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| line.split_once(' '))
+        .filter(|(key, _)| matches!(*key, "active_file" | "inactive_file"))
+        .filter_map(|(_, value)| value.trim().parse::<u64>().ok())
+        .sum();
+    Some(limit.saturating_sub(current.saturating_sub(reclaimable)))
 }
 
 async fn download_output(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {

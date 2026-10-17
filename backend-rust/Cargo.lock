@@ -811,6 +811,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "hkdf",
+ "libc",
  "nvml-wrapper",
  "rand 0.8.8",
  "rcgen",

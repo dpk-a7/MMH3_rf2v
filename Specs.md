@@ -1,5 +1,5 @@
 ### ADDENDUM: Single-Endpoint Blind Envelope Routing
-- Apart from the initial key-exchange (`POST /api/v1/crypto/handshake`) and static UI asset serving (`GET /`), consolidate ALL API actions (`list_models`, `upload_media`, `generate_video`, `download_output`, `flush_all`) into a SINGLE unified endpoint: `POST /api/v1/envelope` (plus `GET /api/v1/ws` for encrypted binary WebSocket frames).
+- Apart from the initial key-exchange (`POST /api/v1/crypto/handshake`) and static UI asset serving (`GET /`), consolidate ALL API actions (`list_models`, `upload_media`, `generate_video`, `job_status`, `download_output`, `flush_all`) into a SINGLE unified endpoint: `POST /api/v1/envelope` (plus `GET /api/v1/ws` for encrypted binary WebSocket frames).
 - The client must place the target action name, headers, metadata, and binary file buffers inside a single MessagePack structure, pad it to a 64 KB block boundary (to prevent file-size traffic analysis), and encrypt the entire MessagePack buffer with AES-256-GCM before sending it to `POST /api/v1/envelope`.
 Transport Layer (In-Memory Ephemeral TLS 1.3 via rustls + rcgen): On startup, the Rust backend generates an ephemeral Ed25519 / ECDSA P-256 TLS 1.3 certificate purely in RAM (never touching disk). All HTTP and WebSocket traffic entering and exiting port 8443 uses encrypted HTTPS and WSS (TLS_AES_256_GCM_SHA384).
 
@@ -26,9 +26,9 @@ Build a strictly non-logging, memory-managed, multi-GPU **Reference-to-Video-and
 |                                         In-Memory Unix Socket      | /dev/shm     |
 |                                         (Protobuf / MessagePack)   v              |
 |  +-----------------------------------------------------------------------------+  |
-|  |             Multi-GPU Inference Engine (1..N GPUs via NCCL / Torch)         |  |
+|  |        Multi-GPU Inference Engine (1..N GPUs, single worker process)        |  |
 |  |  - Staged Pinned-RAM Offloader (Phase 1: Encode -> Phase 2: DiT -> Phase 3) |  |
-|  |  - Tensor Parallelism (TP) + Context Parallelism (Ulysses Attention)        |  |
+|  |  - Whole-Model GPU Placement + ComfyUI model_management (lowvram stream)   |  |
 |  |  - Bitexact FFmpeg Muxer (stdin pipe -> /app/ephemeral/outputs, no metadata)|  |
 |  +-----------------------------------------------------------------------------+  |
 +-----------------------------------------------------------------------------------+
@@ -66,9 +66,8 @@ minimax-h3-ref2v/
 │       ├── storage.rs                      # Ephemeral tmpfs manager, 24h TTL reaper, secure unlink
 │       └── math.rs                         # Resolution grid & 17k+5 frame alignment math
 ├── inference-worker/
-│   ├── worker_daemon.py                    # torchrun multi-GPU NCCL daemon listening on /dev/shm
-│   ├── memory_manager.py                   # 3-stage VRAM <-> Pinned CPU RAM offloader
-│   ├── parallel_shard.py                   # Tensor Parallel (1..N GPU) & Ulysses Ring Attention
+│   ├── worker_daemon.py                    # Single-process GPU daemon listening on /dev/shm
+│   ├── memory_manager.py                   # Model cache, RAM gates, per-GPU placement planner
 │   └── pipeline_h3.py                      # Exact node execution for MiniMaxH3ReferenceToVideo
 └── frontend/
     ├── package.json
@@ -348,14 +347,15 @@ Pre-allocate a pinned host memory pool (`torch.cuda.MemPool` / `pin_memory=True`
 * Encode prompt and all reference images/videos/audios into `positive` conditioning tensors and initialize the empty joint AV `latent`.
 
 
-* **Offload**: Asynchronously move `qwen3vl_32b`, `video_vae`, and `audio_vae` weights to Pinned Host RAM (`to("cpu", non_blocking=True)`), call `torch.cuda.synchronize()`, `torch.cuda.empty_cache()`, and `libc.malloc_trim(0)`.
+* **Offload** (when the encoders share a GPU with the DiT; see §4.2): unload `qwen3vl_32b`, `video_vae`, and `audio_vae` from that GPU back to host RAM through ComfyUI `model_management.free_memory`, then `torch.cuda.empty_cache()` and `libc.malloc_trim(0)`.
 
 
 2. **Stage 2 (DiT Joint Audio-Video Denoising)**:
 * Stream `minimax_h3_ref2va_pruned_int8_convrot` (+ fused/patched Turbo LoRA + ControlNet if active) from Pinned Host RAM to GPU(s).
 
 
-* Enable **Block-Sparse Attention** on sequences $> 12,288$ tokens (`tau = 1.3`, `start_percent = 0.2`, `end_percent = 0.9`, `sink_conditioning = "exact_kv_and_rows"` to keep reference and audio query rows exact).
+* Attention uses ComfyUI's native optimized (exact) attention; no approximate block-sparse override is installed.
+* Before sampling, reject with `insufficient_vram` if `model.memory_required(latent_shape)` (activation memory, which cannot be streamed) exceeds the DiT GPU's reachable VRAM.
 * Run `res_multistep` sampling steps.
 
 
@@ -371,24 +371,25 @@ Pre-allocate a pinned host memory pool (`torch.cuda.MemPool` / `pin_memory=True`
 
 
 
-### 4.2. Tier 2: Multi-GPU ($1 \dots N$) Tensor & Context Parallelism
+### 4.2. Tier 2: Multi-GPU ($1 \dots N$) Whole-Model Placement
 
-The Rust backend detects available GPUs via `nvml-wrapper` (or `NVIDIA_VISIBLE_DEVICES`) and launches the Python/CUDA backend via `torchrun --nproc_per_node=N`:
+A **single** worker process (no `torchrun`, no NCCL) owns every visible GPU. Weights stay in their shipped compressed formats (int8 DiT, nvfp4 text encoder); they are never sharded or dequantized. Every checkpoint is loaded exactly once into host RAM, one at a time.
 
-* **When $N = 1$**: Executes the 3-Stage Pinned-Memory Offloading pipeline on `cuda:0`.
-* **When $N \ge 2$**:
-1. **Tensor Parallelism (TP via NCCL)**:
-* Shard `qwen3vl_32b` and `minimax_h3_ref2va` transformer blocks across ranks $0 \dots N-1$ (Column-parallel QKV & SwiGLU gate/up projections; Row-parallel O & down projections with `all_reduce`).
+* **Placement planner** (`memory_manager.plan_devices`, run at worker start and after every flush): reads free/total VRAM per GPU from `nvidia-smi` (no CUDA context is created on busy cards). GPUs with free VRAM below `max(MMH3_MIN_FREE_VRAM_GB (default 6), 30 % of total)` are skipped, so cards occupied by other workloads are left alone. Remaining GPUs are sorted by free VRAM:
+  * GPU #1 (emptiest): `minimax_h3_ref2va` DiT + Turbo LoRA + ControlNet (Stage 2).
+  * GPU #2: `qwen3vl_32b` text encoder + video VAE (FP16) + audio VAE (FP32) (Stages 1 and 3).
+* **When only one GPU qualifies**: all models share it; Stage 1 encoders are unloaded before Stage 2 and the DiT is unloaded before Stage 3.
+* **When $N \ge 2$**: encoders stay resident on their own GPU between jobs, and the DiT has a GPU to itself.
+* Each model is loaded while its target GPU is the current CUDA device, so ComfyUI binds `load_device` to it natively. ComfyUI's `model_management.load_models_gpu` then decides per model whether to load fully or stream weights in `lowvram` mode, using pinned host RAM, and evicts models on that GPU when another needs the space. ComfyUI's VAE decode falls back to tiled decoding on OOM.
+* `CUDA_DEVICE_ORDER=PCI_BUS_ID` keeps PyTorch device indices identical to `nvidia-smi`.
 
+### 4.3. Resource Guardrails (checked before the limit is hit)
 
-2. **Ulysses Sequence / Context Parallelism (CP)**:
-* Reference-to-Video with up to 9 images and 3 videos produces massive token sequences. Split sequence dimension $S / N$ across GPUs before attention, perform `all_to_all` communication on attention heads so each GPU computes full-sequence attention for a subset of heads, then `all_to_all` back.
-
-
-
-
-3. **Disaggregated Dual-VAE Decode**:
-* Rank `0` decodes `minimax_h3_video_vae_fp16` while Rank `1` simultaneously decodes `minimax_h3_audio_vae_fp32`, eliminating audio decode latency.
+* **Container**: `mem_limit`/`memswap_limit` (`MMH3_MEM_LIMIT`, default `100g`) so an overrun is contained in the container; tmpfs sizes are fixed (`/tmp` 4G, `/dev/shm` 16G, `/app/ephemeral` 32G). The worker is restarted automatically by the entrypoint if it ever exits.
+* **Rust backend**: `upload_media` and `generate_video` check `statvfs` free space on `/app/ephemeral` and cgroup-aware available RAM (`insufficient_storage` / `insufficient_ram`), and reject with `server_busy` when the queue is full.
+* **Worker, per model**: before reading a checkpoint, require `file_size × 1.25 + max(6 GB, 8 % RAM)` available RAM (cgroup-aware). If short, evict cached models not needed by the current job, then fail with `insufficient_ram` instead of swapping or being OOM-killed.
+* **Worker, per job**: host RAM for decoded frames is checked before Stage 1 and again before Stage 3; activation VRAM is checked before Stage 2 (§4.1); a runtime CUDA OOM is reported as `insufficient_vram`, and memory is trimmed.
+* **Progress**: every stage (`preflight_gate`, `load_*`, `stage1_*`, `stage2_denoise` step k/N, `stage3_*`) is pushed over WSS and also exposed through the `job_status` envelope action for polling.
 
 
 
@@ -688,7 +689,7 @@ fn is_selectable_model_file(name: &str) -> bool {
 
 ## 6. (Updated) Pinned-RAM Model Registry & Hot-Swapping (`inference-worker/memory_manager.py`)
 
-When the user selects a different diffusion, VAE, CLIP, LoRA, or ControlNet file in the UI Model Selector, the GPU worker must safely evict the previously cached weights from Pinned Host RAM before loading the new file so system RAM never leaks or OOMs:
+When the user selects a different diffusion, VAE, CLIP, LoRA, or ControlNet file in the UI Model Selector, the GPU worker must safely evict the previously cached weights from Pinned Host RAM before loading the new file so system RAM never leaks or OOMs. The implementation (`ModelRegistry`) follows this sketch and also applies the per-model RAM gate (§4.3) and loads each model under its planned GPU (§4.2):
 
 ```python
 # inference-worker/memory_manager.py
@@ -1142,7 +1143,7 @@ services:
     # 1. STRICT NON-LOGGING MODE AT CONTAINER LEVEL
     logging:
       driver: "none"
-    # 2. ALL 1..N GPUS ENABLED WITH NCCL SHM SUPPORT
+    # 2. ALL 1..N GPUS VISIBLE; WORKER PLACES WHOLE MODELS PER GPU
     deploy:
       resources:
         reservations:
@@ -1150,7 +1151,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    ipc: host
+    # Hard RAM ceiling so overruns are contained in the container, never the host
+    mem_limit: ${MMH3_MEM_LIMIT:-100g}
+    memswap_limit: ${MMH3_MEM_LIMIT:-100g}
     ulimits:
       memlock: -1
       stack: 67108864
@@ -1174,8 +1177,10 @@ services:
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:512
       - EPHEMERAL_DIR=/app/ephemeral
       - TTL_SECONDS=86400
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+      - MMH3_MIN_FREE_VRAM_GB=6
     ports:
-      - "8080:8080"
+      - "8443:8443"
     restart: unless-stopped
 
 ```
@@ -1217,8 +1222,8 @@ COPY --from=rust-builder /backend/target/release/minimax-h3-backend /app/minimax
 COPY --from=frontend-builder /ui/dist /app/static
 COPY inference-worker/ /app/inference-worker/
 
-# Entrypoint launches torchrun (auto-detecting 1..N GPUs) + Rust Axum server with stdout/stderr routed to /dev/null
-ENTRYPOINT ["/bin/sh", "-c", "NGPU=$(nvidia-smi -L | wc -l) && torchrun --standalone --nproc_per_node=$NGPU /app/inference-worker/worker_daemon.py >/dev/null 2>&1 & exec /app/minimax-h3-backend >/dev/null 2>&1"]
+# Entrypoint launches one self-restarting GPU worker (placing models across 1..N GPUs) + Rust Axum server, stdout/stderr routed to /dev/null
+ENTRYPOINT ["/bin/sh", "-c", "(while true; do python3 /app/inference-worker/worker_daemon.py >/dev/null 2>&1; sleep 3; done) & exec /app/minimax-h3-backend >/dev/null 2>&1"]
 
 ```
 
@@ -1229,10 +1234,10 @@ ENTRYPOINT ["/bin/sh", "-c", "NGPU=$(nvidia-smi -L | wc -l) && torchrun --standa
 Copy and paste the following directive when starting your coding agent session:
 
 > **"Read `AGENT_BLUEPRINT.md` and implement the complete project in the current workspace. Execute in 4 sequential phases, running `cargo check` and `npm run build` to verify each phase before proceeding:**
-> 1. **Phase 1 (Rust Backend)**: Scaffold `backend-rust/` with `axum`, implementing `math.rs` (exact `multiple=32` resolution and `17k+5` frame alignment from `46a303cbccf9.json`), `storage.rs` (zero-overwrite file deletion, 24-hour background reaper task, and `DELETE /api/v1/media/flush`), `ipc.rs` (MessagePack over `/dev/shm/minimax_h3.sock`), and zero-logging HTTP/WS routes.
+> 1. **Phase 1 (Rust Backend)**: Scaffold `backend-rust/` with `axum`, implementing `math.rs` (exact `multiple=32` resolution and `17k+5` frame alignment from `46a303cbccf9.json`), `storage.rs` (zero-overwrite file deletion, 24-hour background reaper task, and the `flush_all` envelope action), `ipc.rs` (MessagePack over `/dev/shm/minimax_h3.sock`), and zero-logging HTTP/WS routes.
 > 
 > 
-> 2. **Phase 2 (Multi-GPU Worker)**: Implement `inference-worker/` with `worker_daemon.py`, `memory_manager.py`, `parallel_shard.py`, and `pipeline_h3.py`. Map the exact folder names (`model/diffussion/`, `model/lora/`, `model/controlnet/`, `model/clip/`, `model/vae/`), implement the 3-stage Pinned RAM offloader, $1 \dots N$ GPU Tensor/Ulysses Parallelism, Turbo LoRA 4-step switch (`minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors`), ControlNet union patching, and bitexact FFmpeg muxing of `VAEDecode` (FP16) + `VAEDecodeAudio` (FP32).
+> 2. **Phase 2 (Multi-GPU Worker)**: Implement `inference-worker/` with `worker_daemon.py`, `memory_manager.py`, and `pipeline_h3.py`. Map the exact folder names (`model/diffussion/`, `model/lora/`, `model/controlnet/`, `model/clip/`, `model/vae/`), implement the 3-stage offloader on top of ComfyUI model management, $1 \dots N$ GPU whole-model placement with resource guardrails (§4.2–4.3), Turbo LoRA 4-step switch (`minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors`), ControlNet union patching, and bitexact FFmpeg muxing of `VAEDecode` (FP16) + `VAEDecodeAudio` (FP32).
 > 
 > 
 > 3. **Phase 3 (Frontend UI)**: Build the React + Tailwind studio in `frontend/` with the 9-Image / 3-Video / 3-Audio Reference Rack, `<Picture N>` / `<Video N>` / `<Audio N>` tag-inserting prompt editor, Turbo LoRA & ControlNet controls, and the 1-Click Flush Media button.
