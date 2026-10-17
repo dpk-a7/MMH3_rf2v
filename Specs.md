@@ -380,7 +380,7 @@ A **single** worker process (no `torchrun`, no NCCL) owns every visible GPU. Wei
   * GPU #2: `qwen3vl_32b` text encoder + video VAE (FP16) + audio VAE (FP32) (Stages 1 and 3).
 * **When only one GPU qualifies**: all models share it; Stage 1 encoders are unloaded before Stage 2 and the DiT is unloaded before Stage 3.
 * **When $N \ge 2$**: encoders stay resident on their own GPU between jobs, and the DiT has a GPU to itself.
-* Each model is loaded while its target GPU is the current CUDA device, so ComfyUI binds `load_device` to it natively. ComfyUI's `model_management.load_models_gpu` then decides per model whether to load fully or stream weights in `lowvram` mode, using pinned host RAM, and evicts models on that GPU when another needs the space. ComfyUI's VAE decode falls back to tiled decoding on OOM.
+* Each model is loaded while its target GPU is the current CUDA device, so ComfyUI binds `load_device` to it natively. ComfyUI's `model_management.load_models_gpu` then decides per model whether to load fully or stream weights in `lowvram` mode, using pinned host RAM, and evicts models on that GPU when another needs the space. Video decoding always goes through the standard `VAEDecode` node (never `VAEDecodeTiled`); the MiniMax video VAE chunks internally (256 px spatial, 17-frame temporal) and, on OOM, re-runs that same native chunked decode with smaller tiles on the already-separated video latent.
 * `CUDA_DEVICE_ORDER=PCI_BUS_ID` keeps PyTorch device indices identical to `nvidia-smi`.
 
 ### 4.3. Resource Guardrails (checked before the limit is hit)

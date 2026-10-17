@@ -3,6 +3,7 @@ import ctypes
 import gc
 import os
 import subprocess
+import sys
 import threading
 
 import torch
@@ -248,6 +249,8 @@ class ModelRegistry:
 
 
 def _unload_comfy_models():
+    if "comfy.model_management" not in sys.modules:
+        return
     try:
         import comfy.model_management as mm
 

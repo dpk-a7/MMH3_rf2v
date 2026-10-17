@@ -51,20 +51,27 @@ def check_host_gate(width, height, frames):
         raise ResourceLimitExceeded("insufficient_storage")
 
 
-def check_vram_gate(model, latent, device):
-    """Activations cannot be streamed like weights: they must fit on the DiT GPU."""
+def check_vram_gate(model, positive, latent, device):
+    """Activations cannot be streamed like weights: they must fit on the DiT GPU.
+
+    Uses ComfyUI's own batch-1 estimate, which includes the reference-latent conditioning.
+    """
     if device.type != "cuda":
         return
+    import comfy.model_management as mm
+    import comfy.sampler_helpers as helpers
+
     shape = getattr(latent.get("samples"), "shape", None)
     if shape is None:
         return
     try:
-        need = int(model.model.memory_required(shape))
+        conds = {"positive": helpers.convert_cond(positive)}
+        _full, minimum = helpers.estimate_memory(model, list(shape), conds)
+        need = int(minimum + mm.minimum_inference_memory())
     except Exception:
         return
     free_b, _total_b = torch.cuda.mem_get_info(device)
-    reachable = free_b + torch.cuda.memory_reserved(device) - GIB
-    if need > reachable:
+    if need > free_b + torch.cuda.memory_reserved(device):
         raise ResourceLimitExceeded("insufficient_vram")
 
 
@@ -84,9 +91,13 @@ def boot_comfy(model_root):
     import logging
 
     logging.disable(logging.CRITICAL)
+    import comfy.model_management as mm
     import comfy.utils
     import folder_paths
 
+    # ComfyUI sizes its pin budget from host RAM; pinned pages cannot be reclaimed, so cap it to the container.
+    if mm.MAX_PINNED_MEMORY > 0:
+        mm.MAX_PINNED_MEMORY = min(mm.MAX_PINNED_MEMORY, host_ram_info()[1] * 0.6)
     comfy.utils.PROGRESS_BAR_ENABLED = False
     for sub in ("output", "temp", "input", "user"):
         os.makedirs(f"/tmp/comfyui/{sub}", exist_ok=True)
@@ -255,7 +266,7 @@ def run_job(payload, registry, progress, abort_event):
         report("stage1_offload", 0.24, f"Encoders stay resident on {enc_dev}; DiT has {dit_dev} to itself")
 
     report("stage2_load", 0.27, f"Stage 2: checking activation memory on {dit_dev}")
-    check_vram_gate(runner, latent, dit_dev)
+    check_vram_gate(runner, positive, latent, dit_dev)
     with device_scope(dit_dev):
         sampled = _stage2_sample(runner, positive, latent, steps, denoise, scheduler, seed, checkpoint, report)
     checkpoint()
