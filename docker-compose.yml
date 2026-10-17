@@ -1,0 +1,52 @@
+services:
+  minimax-h3-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minimax_h3_ref2v
+    logging:
+      driver: "none"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    read_only: true
+    tmpfs:
+      - /tmp:size=4G,mode=1777
+      - /dev/shm:size=16G,mode=1777
+      - /app/ephemeral:size=32G,mode=0700
+    volumes:
+      - ./model/diffussion:/app/model/diffussion:ro
+      - ./model/lora:/app/model/lora:ro
+      - ./model/controlnet:/app/model/controlnet:ro
+      - ./model/clip:/app/model/clip:ro
+      - ./model/vae:/app/model/vae:ro
+    environment:
+      - RUST_LOG=off
+      - RUST_BACKTRACE=0
+      - PYTHONIOENCODING=utf-8
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONPATH=/opt/comfyui:/app/inference-worker
+      - COMFYUI_ROOT=/opt/comfyui
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:512
+      - EPHEMERAL_DIR=/app/ephemeral
+      - TTL_SECONDS=86400
+      - BIND_ADDR=0.0.0.0:8443
+      - MODEL_ROOT=/app/model
+      - STATIC_DIR=/app/static
+      - IPC_SOCK=/dev/shm/minimax_h3.sock
+      - HOME=/tmp
+      - XDG_CACHE_HOME=/tmp/cache
+      - TORCH_HOME=/tmp/torch
+      - HF_HOME=/tmp/hf
+      - NCCL_IB_DISABLE=1
+    ports:
+      - "8443:8443"
+    restart: unless-stopped

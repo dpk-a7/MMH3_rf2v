@@ -1,0 +1,9 @@
+**/.git
+**/target
+**/node_modules
+**/dist
+ephemeral
+model/**/*.safetensors
+model/**/*.ckpt
+model/**/*.pt
+**/*.sock

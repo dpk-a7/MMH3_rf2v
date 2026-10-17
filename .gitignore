@@ -1,0 +1,9 @@
+/backend-rust/target
+/frontend/node_modules
+/frontend/dist
+/ephemeral
+**/*.sock
+.DS_Store
+__pycache__/
+*.pyc
+graphify-out/cache/

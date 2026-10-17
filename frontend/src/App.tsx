@@ -1,0 +1,439 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  SecureClient,
+  type EnvelopeResult,
+  type ProgressEvent,
+} from "./cryptoClient";
+import {
+  EMPTY_MODELS,
+  FACTORY_DEFAULTS,
+  GenerationControls,
+  type GenerationState,
+  type ModelLists,
+} from "./components/GenerationControls";
+import { PanicFlushButton } from "./components/PanicFlushButton";
+import { PromptTagEditor } from "./components/PromptTagEditor";
+import { ReferenceRack, emptySlots, type SlotState } from "./components/ReferenceRack";
+import { computeAlignedFrames, computeSize } from "./math";
+
+const DEFAULT_PROMPT =
+  "Bold comic-book ink style, crisp outlines, dramatic rim light. Use <Picture 1> and <Picture 2> as identity references.";
+
+type GpuInfo = { index: number; name: string; memory_total_mb: number };
+
+export function App() {
+  const client = useMemo(() => new SecureClient(), []);
+  const urls = useRef(new Set<string>());
+  const insertRef = useRef<(tag: string) => void>(() => undefined);
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState("Securing session");
+  const [error, setError] = useState("");
+  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
+  const [settings, setSettings] = useState<GenerationState>(FACTORY_DEFAULTS);
+  const [models, setModels] = useState<ModelLists>(EMPTY_MODELS);
+  const [gpus, setGpus] = useState<GpuInfo[]>([]);
+  const [images, setImages] = useState<SlotState[]>(() => emptySlots(9));
+  const [videos, setVideos] = useState<SlotState[]>(() => emptySlots(3));
+  const [videoAudios, setVideoAudios] = useState<SlotState[]>(() => emptySlots(3));
+  const [audios, setAudios] = useState<SlotState[]>(() => emptySlots(3));
+  const [controlId, setControlId] = useState<string | null>(null);
+  const [controlName, setControlName] = useState("");
+  const [seedText, setSeedText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [flushing, setFlushing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState("");
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const activeJob = useRef<string | null>(null);
+
+  const track = useCallback((url: string) => {
+    urls.current.add(url);
+    return url;
+  }, []);
+
+  const revokeAll = useCallback(() => {
+    for (const url of urls.current) {
+      URL.revokeObjectURL(url);
+    }
+    urls.current.clear();
+    setOutputUrl(null);
+  }, []);
+
+  const bindInsert = useCallback((insert: (tag: string) => void) => {
+    insertRef.current = insert;
+  }, []);
+
+  const refreshModels = useCallback(async () => {
+    const result = await client.call("list_models", {});
+    if (!result.ok) {
+      throw new Error(result.error || "list_models_failed");
+    }
+    const available = result.metadata.available as ModelLists | undefined;
+    const nextModels: ModelLists = {
+      diffussion: available?.diffussion ?? [],
+      vae: available?.vae ?? [],
+      clip: available?.clip ?? [],
+      lora: available?.lora ?? [],
+      controlnet: available?.controlnet ?? [],
+    };
+    setModels(nextModels);
+    setSettings((prev) => {
+      const pick = (list: string[], current: string, hint?: string): string => {
+        if (list.length === 0) return current;
+        if (list.includes(current)) return current;
+        if (hint) {
+          const matched = list.find((item) => item.toLowerCase().includes(hint.toLowerCase()));
+          if (matched) return matched;
+        }
+        return list[0];
+      };
+      return {
+        ...prev,
+        diffusionModel: pick(nextModels.diffussion, prev.diffusionModel),
+        clipModel: pick(nextModels.clip, prev.clipModel),
+        videoVaeModel: pick(nextModels.vae, prev.videoVaeModel, "video"),
+        audioVaeModel: pick(nextModels.vae, prev.audioVaeModel, "audio"),
+        loraModel: pick(nextModels.lora, prev.loraModel),
+        controlnetModel:
+          prev.controlnetModel && nextModels.controlnet.includes(prev.controlnetModel)
+            ? prev.controlnetModel
+            : (nextModels.controlnet[0] ?? ""),
+      };
+    });
+    setGpus((result.metadata.gpu_topology as GpuInfo[] | undefined) ?? []);
+  }, [client]);
+
+  useEffect(() => {
+    let stop = false;
+    void (async () => {
+      try {
+        await client.handshake();
+        client.connect((event) => {
+          if (stop) return;
+          handleProgress(event);
+        });
+        await refreshModels();
+        if (!stop) {
+          setReady(true);
+          setStatus("Session ready");
+        }
+      } catch {
+        if (!stop) setError("Secure session failed");
+      }
+    })();
+    return () => {
+      stop = true;
+      client.reset();
+    };
+    // The client instance is stable. Progress handling closes over latest job via ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
+  function handleProgress(event: ProgressEvent) {
+    if (activeJob.current && event.job_id !== activeJob.current) return;
+    setStage(event.stage);
+    setProgress(event.progress);
+    if (event.done) {
+      setBusy(false);
+      if (event.ok) {
+        setStatus("Ready to download");
+        void pullOutput(event.job_id);
+      } else {
+        setError(event.detail || "inference_failed");
+        setStatus("Generation failed");
+      }
+    }
+  }
+
+  async function pullOutput(id: string) {
+    try {
+      const result = await client.call("download_output", { job_id: id });
+      if (!result.ok) {
+        if (result.error === "not_ready") return;
+        setError(result.error || "download_failed");
+        return;
+      }
+      const file = result.files[0];
+      if (!file) return;
+      const copy = new Uint8Array(new ArrayBuffer(file.data.byteLength));
+      copy.set(file.data);
+      const blob = new Blob([copy], { type: "video/mp4" });
+      const url = track(URL.createObjectURL(blob));
+      setOutputUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return url;
+      });
+      setStatus("Playback ready");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "download_failed");
+    }
+  }
+
+  async function uploadSlot(
+    kind: "image" | "video" | "audio" | "control",
+    file: File,
+  ): Promise<string> {
+    const data = new Uint8Array(await file.arrayBuffer());
+    const result: EnvelopeResult = await client.call(
+      "upload_media",
+      { kind, filename: file.name },
+      [{ name: file.name, mime: file.type || "application/octet-stream", kind, data }],
+    );
+    if (!result.ok || typeof result.metadata.media_id !== "string") {
+      throw new Error(result.error || "upload_failed");
+    }
+    return result.metadata.media_id;
+  }
+
+  function replaceSlot(
+    setter: Dispatch<SetStateAction<SlotState[]>>,
+    index: number,
+    next: SlotState,
+  ) {
+    setter((prev) => prev.map((slot, slotIndex) => (slotIndex === index ? next : slot)));
+  }
+
+  async function onPick(kind: "image" | "video" | "audio" | "video-audio", index: number, file: File) {
+    setError("");
+    try {
+      const uploadKind = kind === "video-audio" ? "audio" : kind;
+      const mediaId = await uploadSlot(uploadKind, file);
+      const previewUrl = track(URL.createObjectURL(file));
+      const next = { mediaId, previewUrl, name: file.name };
+      if (kind === "image") replaceSlot(setImages, index, next);
+      else if (kind === "video") replaceSlot(setVideos, index, next);
+      else if (kind === "video-audio") replaceSlot(setVideoAudios, index, next);
+      else replaceSlot(setAudios, index, next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "upload_failed");
+    }
+  }
+
+  function clearPreview(slot: SlotState) {
+    if (slot.previewUrl) {
+      URL.revokeObjectURL(slot.previewUrl);
+      urls.current.delete(slot.previewUrl);
+    }
+  }
+
+  function onClear(kind: "image" | "video" | "audio" | "video-audio", index: number) {
+    const blank: SlotState = { mediaId: null, previewUrl: null, name: "" };
+    if (kind === "image") {
+      setImages((prev) => {
+        clearPreview(prev[index]);
+        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
+      });
+    } else if (kind === "video") {
+      setVideos((prev) => {
+        clearPreview(prev[index]);
+        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
+      });
+    } else if (kind === "video-audio") {
+      setVideoAudios((prev) => {
+        clearPreview(prev[index]);
+        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
+      });
+    } else {
+      setAudios((prev) => {
+        clearPreview(prev[index]);
+        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
+      });
+    }
+  }
+
+  async function onControlFile(file: File | null) {
+    if (!file) {
+      setControlId(null);
+      setControlName("");
+      return;
+    }
+    try {
+      const mediaId = await uploadSlot("control", file);
+      setControlId(mediaId);
+      setControlName(file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "upload_failed");
+    }
+  }
+
+  function handleResetToDefaults() {
+    setSettings({ ...FACTORY_DEFAULTS });
+    setPrompt(DEFAULT_PROMPT);
+    setSeedText("");
+  }
+
+  async function generate() {
+    setError("");
+    setBusy(true);
+    setProgress(0);
+    setStage("queued");
+    setStatus("Submitting");
+    const [width, height] = computeSize(settings.aspectRatio, settings.megapixels);
+    const frames = computeAlignedFrames(settings.durationSec);
+    const seed = seedText.trim() === "" ? null : Number(seedText);
+    try {
+      const result = await client.call("generate_video", {
+        models: {
+          diffusion: settings.diffusionModel,
+          video_vae: settings.videoVaeModel,
+          audio_vae: settings.audioVaeModel,
+          clip: settings.clipModel,
+          lora: settings.loraModel,
+          controlnet: settings.controlnetEnabled ? settings.controlnetModel || null : null,
+        },
+        mode: settings.mode,
+        steps: settings.steps,
+        lora_strength: settings.loraStrength,
+        prompt,
+        duration_sec: settings.durationSec,
+        aspect_ratio: settings.aspectRatio,
+        megapixels: settings.megapixels,
+        fps: settings.fps,
+        ref_image_size: settings.refImageSize,
+        sampler_name: settings.samplerName,
+        scheduler: settings.scheduler,
+        denoise: settings.denoise,
+        seed: seed !== null && Number.isFinite(seed) ? Math.floor(seed) : null,
+        controlnet_config: {
+          enabled: settings.controlnetEnabled,
+          control_media_id: controlId,
+          strength: settings.controlnetStrength,
+          start_percent: settings.controlStart,
+          end_percent: settings.controlEnd,
+        },
+        references: {
+          images: images.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
+          videos: videos.flatMap((slot) => (slot.mediaId ? [slot.mediaId] : [])),
+          video_audios: videos.flatMap((slot, index) =>
+            slot.mediaId ? [videoAudios[index]?.mediaId ?? null] : [],
+          ),
+          audios: audios.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
+        },
+      });
+      if (!result.ok || typeof result.metadata.job_id !== "string") {
+        setBusy(false);
+        setError(result.error || "generate_failed");
+        return;
+      }
+      activeJob.current = result.metadata.job_id;
+      setJobId(result.metadata.job_id);
+      setStatus(`${width}×${height} · ${frames} frames`);
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : "generate_failed");
+    }
+  }
+
+  async function flushAll() {
+    setFlushing(true);
+    setError("");
+    try {
+      await client.call("flush_all", {});
+    } catch {
+      setError("flush_failed");
+    }
+    revokeAll();
+    setImages(emptySlots(9));
+    setVideos(emptySlots(3));
+    setVideoAudios(emptySlots(3));
+    setAudios(emptySlots(3));
+    setControlId(null);
+    setControlName("");
+    setJobId(null);
+    activeJob.current = null;
+    setBusy(false);
+    setProgress(0);
+    setStage("");
+    client.reset();
+    try {
+      await client.handshake();
+      client.connect((event) => handleProgress(event));
+      await refreshModels();
+      setReady(true);
+      setStatus("Media flushed");
+    } catch {
+      setReady(false);
+      setError("Secure session failed");
+    } finally {
+      setFlushing(false);
+    }
+  }
+
+  const gpuLabel =
+    gpus.length === 0 ? "No GPU reported" : gpus.map((gpu) => gpu.name).join(", ");
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <header className="border-b border-zinc-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">MiniMax-H3 Ref2VA</h1>
+          <p className="text-xs text-zinc-500 mt-1">
+            {status}
+            {ready ? ` · ${gpuLabel}` : ""}
+            {jobId ? ` · ${jobId.slice(0, 8)}` : ""}
+          </p>
+        </div>
+        <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
+      </header>
+      <main className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_420px] gap-4 p-4">
+        <ReferenceRack
+          images={images}
+          videos={videos}
+          videoAudios={videoAudios}
+          audios={audios}
+          busy={!ready || flushing}
+          onPick={(kind, index, file) => void onPick(kind, index, file)}
+          onClear={onClear}
+          onInsert={(tag) => insertRef.current(tag)}
+        />
+        <section className="space-y-4">
+          <PromptTagEditor prompt={prompt} setPrompt={setPrompt} bindInsert={bindInsert} />
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <label className="text-xs text-zinc-400">
+                Seed
+                <input
+                  value={seedText}
+                  onChange={(event) => setSeedText(event.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="random"
+                  className="mt-1 block w-40 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={!ready || busy || flushing}
+                onClick={() => void generate()}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-sm font-semibold"
+              >
+                {busy ? "Generating" : "Generate"}
+              </button>
+            </div>
+            <div>
+              <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                <span>{stage || "idle"}</span>
+                <span className="font-mono">{Math.round(progress * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-zinc-950 overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${Math.round(progress * 100)}%` }} />
+              </div>
+            </div>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            {outputUrl && (
+              <video src={outputUrl} controls className="w-full rounded-lg bg-black max-h-[480px]" />
+            )}
+          </div>
+        </section>
+        <GenerationControls
+          state={settings}
+          setState={setSettings}
+          availableModels={models}
+          onResetDefaults={handleResetToDefaults}
+          onRefreshModels={() => void refreshModels()}
+          controlName={controlName}
+          onControlFile={(file) => void onControlFile(file)}
+        />
+      </main>
+    </div>
+  );
+}
