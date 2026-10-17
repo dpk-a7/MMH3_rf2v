@@ -19,16 +19,9 @@ use uuid::Uuid;
 use zeroize::Zeroize;
 
 use crate::crypto::{self, SessionKey};
-use crate::ipc::{IpcClient, ProgressEvent};
+use crate::ipc::{GpuInfo, IpcClient, ProgressEvent};
 use crate::math;
 use crate::storage::{EphemeralStorage, TTL_SECONDS};
-
-#[derive(Clone, Serialize)]
-pub struct GpuInfo {
-    pub index: u32,
-    pub name: String,
-    pub memory_total_mb: u64,
-}
 
 #[derive(Serialize)]
 pub struct ModelCatalogResponse {
@@ -135,6 +128,7 @@ pub struct JobRecord {
     pub output: PathBuf,
     pub error: Option<String>,
     pub created: Instant,
+    pub gpus: Vec<GpuInfo>,
 }
 
 #[derive(Deserialize)]
@@ -385,6 +379,10 @@ fn is_selectable_model_file(name: &str) -> bool {
         || lower.ends_with(".onnx")
 }
 
+const VRAM_SAFETY_RESERVE_MB: u64 = 1536;
+const MIN_USABLE_VRAM_MB: u64 = 3072;
+const TIGHT_VRAM_THRESHOLD_MB: u64 = 8192;
+
 pub fn detect_gpus() -> Vec<GpuInfo> {
     if let Ok(nvml) = nvml_wrapper::Nvml::init() {
         if let Ok(count) = nvml.device_count() {
@@ -394,22 +392,56 @@ pub fn detect_gpus() -> Vec<GpuInfo> {
                     continue;
                 };
                 let name = device.name().unwrap_or_else(|_| "gpu".to_string());
-                let memory_total_mb = device
+                let (free_vram_mb, total_vram_mb) = device
                     .memory_info()
-                    .map(|info| info.total / (1024 * 1024))
-                    .unwrap_or(0);
+                    .map(|info| (info.free / (1024 * 1024), info.total / (1024 * 1024)))
+                    .unwrap_or((0, 0));
                 gpus.push(GpuInfo {
                     index,
                     name,
-                    memory_total_mb,
+                    memory_total_mb: total_vram_mb,
+                    free_vram_mb,
+                    total_vram_mb,
+                    allocated_weight_pct: 0.0,
+                    role: String::new(),
                 });
             }
             if !gpus.is_empty() {
-                return gpus;
+                return classify_gpu_roles(gpus);
             }
         }
     }
-    fallback_gpus()
+    classify_gpu_roles(fallback_gpus())
+}
+
+fn classify_gpu_roles(mut gpus: Vec<GpuInfo>) -> Vec<GpuInfo> {
+    let usables: Vec<u64> = gpus
+        .iter()
+        .map(|gpu| gpu.free_vram_mb.saturating_sub(VRAM_SAFETY_RESERVE_MB))
+        .collect();
+    let mut total_usable = 0u64;
+    for (gpu, usable) in gpus.iter_mut().zip(usables.iter().copied()) {
+        if usable < MIN_USABLE_VRAM_MB {
+            gpu.role = "bypassed_busy".into();
+            gpu.allocated_weight_pct = 0.0;
+        } else {
+            gpu.role = if usable < TIGHT_VRAM_THRESHOLD_MB {
+                "active_tight_partial"
+            } else {
+                "active_full"
+            }
+            .into();
+            total_usable += usable;
+        }
+    }
+    if total_usable > 0 {
+        for (gpu, usable) in gpus.iter_mut().zip(usables.iter().copied()) {
+            if gpu.role != "bypassed_busy" {
+                gpu.allocated_weight_pct = (usable as f32 / total_usable as f32) * 100.0;
+            }
+        }
+    }
+    gpus
 }
 
 fn fallback_gpus() -> Vec<GpuInfo> {
@@ -424,6 +456,10 @@ fn fallback_gpus() -> Vec<GpuInfo> {
             index: 0,
             name: "all".into(),
             memory_total_mb: 0,
+            free_vram_mb: 0,
+            total_vram_mb: 0,
+            allocated_weight_pct: 0.0,
+            role: "bypassed_busy".into(),
         }];
     }
     visible
@@ -433,6 +469,10 @@ fn fallback_gpus() -> Vec<GpuInfo> {
             index: index as u32,
             name: format!("gpu:{id}"),
             memory_total_mb: 0,
+            free_vram_mb: 0,
+            total_vram_mb: 0,
+            allocated_weight_pct: 0.0,
+            role: "bypassed_busy".into(),
         })
         .collect()
 }
@@ -766,6 +806,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             output: output.clone(),
             error: None,
             created: Instant::now(),
+            gpus: detect_gpus(),
         },
     );
 
@@ -833,6 +874,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             job.progress = 0.02;
             job.detail = "Connecting to multi-GPU inference worker".into();
         }
+        let start_gpus = detect_gpus();
         let _ = progress.send(ProgressEvent {
             job_id: job_key.to_string(),
             stage: "starting".into(),
@@ -840,6 +882,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             detail: "Connecting to multi-GPU inference worker".into(),
             done: false,
             ok: true,
+            gpus: start_gpus,
         });
         let tx = progress.clone();
         let jobs_for_cb = jobs.clone();
@@ -849,12 +892,19 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                     job.stage = event.stage.clone();
                     job.progress = event.progress;
                     job.detail = event.detail.clone();
+                    if !event.gpus.is_empty() {
+                        job.gpus = event.gpus.clone();
+                    }
                 }
                 let _ = tx.send(event);
             })
             .await;
         match outcome {
             Ok(_) => {
+                let gpus = jobs
+                    .get(&job_key)
+                    .map(|job| job.gpus.clone())
+                    .unwrap_or_default();
                 if let Some(mut job) = jobs.get_mut(&job_key) {
                     if job.status != JobStatus::Aborted {
                         job.status = JobStatus::Done;
@@ -871,10 +921,15 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                     detail: "ready".into(),
                     done: true,
                     ok: true,
+                    gpus,
                 });
             }
             Err(code) => {
                 let aborted = code == "aborted";
+                let gpus = jobs
+                    .get(&job_key)
+                    .map(|job| job.gpus.clone())
+                    .unwrap_or_default();
                 if let Some(mut job) = jobs.get_mut(&job_key) {
                     job.status = if aborted {
                         JobStatus::Aborted
@@ -893,6 +948,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
                     detail: code,
                     done: true,
                     ok: false,
+                    gpus,
                 });
             }
         }
@@ -1008,6 +1064,7 @@ async fn job_status(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, S
             "done": done,
             "ok": ok,
             "error": record.error,
+            "gpus": record.gpus,
         }),
         files: Vec::new(),
         error: None,

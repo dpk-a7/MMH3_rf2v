@@ -10,12 +10,15 @@ import torch.nn.functional as F
 
 from memory_manager import (
     GIB,
+    TIGHT_VRAM_THRESHOLD_MB,
     ResourceLimitExceeded,
     describe_plan,
     device_scope,
+    estimate_stage_memory_mb,
     host_ram_info,
     ram_reserve_bytes,
 )
+from parallel_shard import apply_proportional_block_sharding
 
 _COMFY_READY = False
 CPU = torch.device("cpu")
@@ -289,6 +292,72 @@ def _unload_device(device):
     mm.soft_empty_cache()
 
 
+def _unwrap_nn(obj):
+    cur = obj
+    for attr in ("model", "diffusion_model", "cond_stage_model", "first_stage_model"):
+        nxt = getattr(cur, attr, None)
+        if nxt is not None:
+            cur = nxt
+    return cur
+
+
+def _bind_module_device(obj, device):
+    inner = _unwrap_nn(obj)
+    if inner is not None and hasattr(inner, "to"):
+        try:
+            inner.to(device)
+        except Exception:
+            pass
+    if hasattr(obj, "device"):
+        try:
+            obj.device = device
+        except Exception:
+            pass
+    patcher = getattr(obj, "patcher", None) or getattr(obj, "model_patcher", None)
+    if patcher is not None:
+        for attr in ("load_device", "offload_device", "current_device"):
+            if hasattr(patcher, attr):
+                try:
+                    setattr(patcher, attr, device)
+                except Exception:
+                    pass
+
+
+def _apply_stage_shards(module, schedule, report, frac, label):
+    summary = apply_proportional_block_sharding(_unwrap_nn(module), schedule)
+    mode = summary.get("mode")
+    lead = summary.get("lead_device")
+    if mode == "pinned_block_streaming":
+        report(f"schedule_{label}", frac, f"{label}: pinned block streaming on {lead}")
+    elif mode == "proportional_sharding":
+        blocks = summary.get("blocks_by_gpu") or {}
+        parts = [f"gpu{idx}:{len(idxs)}" for idx, idxs in sorted(blocks.items())]
+        report(f"schedule_{label}", frac, f"{label}: proportional shards {' '.join(parts)} lead={lead}")
+    return summary
+
+
+def _tighten_video_vae(vae, usable_mb):
+    if usable_mb >= TIGHT_VRAM_THRESHOLD_MB:
+        return
+    chunk = 2 if usable_mb >= 4096 else 1
+    for obj in (vae, getattr(vae, "first_stage_model", None)):
+        if obj is None:
+            continue
+        for name in ("tokens_chunk_size", "decode_chunk_size"):
+            cur = getattr(obj, name, None)
+            if isinstance(cur, int):
+                setattr(obj, name, min(cur, chunk))
+
+
+def _cuda_oom(exc):
+    return isinstance(exc, torch.cuda.OutOfMemoryError) or "out of memory" in str(exc).lower()
+
+
+def _count_refs(payload):
+    refs = payload.get("references") or {}
+    return len(refs.get("images") or []) + len(refs.get("videos") or []) + len(refs.get("audios") or [])
+
+
 def _at(result, index):
     return result[index]
 
@@ -319,16 +388,25 @@ def run_job(payload, registry, progress, abort_event):
     ref_mode = payload.get("ref_image_size", "match")
     cn_cfg = payload.get("controlnet_config") or {}
     strength = float(payload.get("lora_strength", 1.0))
+    num_refs = _count_refs(payload)
+    req = estimate_stage_memory_mb("stage1", width, height, frames, num_refs)
+    schedule = registry.probe_and_plan("stage1", required_vram_mb=req)
     plan = registry.plan
     enc_dev = plan["clip"]
     dit_dev = plan["diffusion"]
+    lead = schedule.lead_device
 
-    report("preflight_gate", 0.02, f"Checking RAM/storage headroom ({width}x{height}, {frames}f) - {describe_plan(plan)}")
+    roles = " ".join(f"gpu{g.index}:{g.role}/{g.allocated_weight_pct:.0f}%" for g in schedule.gpus)
+    report(
+        "preflight_gate",
+        0.02,
+        f"Checking RAM/storage headroom ({width}x{height}, {frames}f) lead={lead} {roles} - {describe_plan(plan)}",
+    )
     check_host_gate(width, height, frames)
 
     report("init_comfy", 0.03, "Initializing headless ComfyUI runtime")
-    if dit_dev.type == "cuda":
-        torch.cuda.set_device(dit_dev)
+    if lead.type == "cuda":
+        torch.cuda.set_device(lead)
     boot_comfy(root)
     import comfy.model_management as mm
 
@@ -337,6 +415,7 @@ def run_job(payload, registry, progress, abort_event):
         return _run_job_inner(
             payload, registry, report, checkpoint, models, mode, width, height, frames, fps,
             seed, steps, denoise, scheduler, ref_mode, cn_cfg, strength, plan, enc_dev, dit_dev,
+            num_refs,
         )
     except mm.InterruptProcessingException as exc:
         raise JobAborted() from exc
@@ -345,6 +424,7 @@ def run_job(payload, registry, progress, abort_event):
 def _run_job_inner(
     payload, registry, report, checkpoint, models, mode, width, height, frames, fps,
     seed, steps, denoise, scheduler, ref_mode, cn_cfg, strength, plan, enc_dev, dit_dev,
+    num_refs,
 ):
     keep = set()
 
@@ -357,6 +437,7 @@ def _run_job_inner(
         return obj
 
     clip = load("clip", "clip", models["clip"], _load_clip, 0.04, "text encoder")
+    _apply_stage_shards(clip, registry.last_schedule, report, 0.05, "qwen3vl")
     video_vae = load(
         "video_vae", "vae", models["video_vae"], lambda p: _load_vae(p, torch.float16), 0.07, "video VAE (FP16)"
     )
@@ -401,19 +482,48 @@ def _run_job_inner(
     else:
         report("stage1_offload", 0.24, f"Encoders stay resident on {enc_dev}; DiT has {dit_dev} to itself")
 
+    req2 = estimate_stage_memory_mb("stage2", width, height, frames, num_refs)
+    schedule2 = registry.probe_and_plan("stage2", required_vram_mb=req2)
+    dit_dev = schedule2.lead_device
+    plan = registry.plan
     report("stage2_load", 0.27, f"Stage 2: checking activation memory on {dit_dev}")
+    _apply_stage_shards(runner, schedule2, report, 0.28, "dit")
     check_vram_gate(runner, positive, latent, dit_dev)
     with device_scope(dit_dev):
-        sampled = _stage2_sample(runner, positive, latent, steps, denoise, scheduler, seed, checkpoint, report)
+        sampled = _stage2_sample(
+            runner, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry
+        )
     checkpoint()
     if enc_dev == dit_dev:
         report("stage2_offload", 0.86, f"Offloading Stage 2 DiT from {dit_dev}")
         _unload_device(dit_dev)
 
-    report("stage3_decode", 0.90, f"Stage 3: decoding video (FP16) + audio (FP32) on {enc_dev}")
+    req3 = estimate_stage_memory_mb("stage3", width, height, frames, num_refs)
+    schedule3 = registry.probe_and_plan("stage3", required_vram_mb=req3)
+    healthy = sorted(schedule3.active_gpus, key=lambda g: (-g.usable_vram_mb, g.index))
+    if not healthy:
+        video_dev = audio_dev = schedule3.lead_device
+        sequential = True
+        usable_mb = 0.0
+    elif len(healthy) >= 2:
+        video_dev = healthy[0].device
+        audio_dev = healthy[1].device
+        sequential = False
+        usable_mb = healthy[0].usable_vram_mb
+    else:
+        video_dev = audio_dev = healthy[0].device
+        sequential = True
+        usable_mb = healthy[0].usable_vram_mb
+    report(
+        "stage3_decode",
+        0.90,
+        f"Stage 3: video VAE (FP16) on {video_dev}, audio VAE (FP32) on {audio_dev}"
+        + (" sequential" if sequential else ""),
+    )
     check_host_gate(width, height, frames)
-    with device_scope(enc_dev):
-        frames_rgb, waveform = _stage3_decode(video_vae, audio_vae, sampled)
+    frames_rgb, waveform = _stage3_decode(
+        video_vae, audio_vae, sampled, video_dev, audio_dev, sequential, usable_mb
+    )
     checkpoint()
 
     report("stage3_mux", 0.97, "Muxing MP4 with FFmpeg")
@@ -525,7 +635,7 @@ def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width)
     return positive
 
 
-def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report):
+def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry=None):
     from comfy_extras.nodes_custom_sampler import (
         BasicGuider,
         BasicScheduler,
@@ -535,17 +645,30 @@ def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, che
     )
     from comfy_extras.nodes_minimax_h3 import MiniMaxH3SigmaShift
 
-    checkpoint()
-    shifted_model = _at(MiniMaxH3SigmaShift.execute(model, 12.0, 3.0), 0)
-    guider = _at(BasicGuider.execute(shifted_model, positive), 0)
-    sampler = _at(KSamplerSelect.execute("res_multistep"), 0)
-    sigmas = _at(BasicScheduler.execute(shifted_model, scheduler, steps, denoise), 0)
-    noise = _at(RandomNoise.execute(int(seed) & 0xFFFFFFFFFFFFFFFF), 0)
-    _hook_progress(guider, steps, report, checkpoint)
-    report("stage2_denoise", 0.30, f"step 0/{steps}")
-    sampled = _at(SamplerCustomAdvanced.execute(noise, guider, sampler, sigmas, latent), 0)
-    report("stage2_denoise", 0.84, f"step {steps}/{steps}")
-    return sampled
+    def _once():
+        checkpoint()
+        shifted_model = _at(MiniMaxH3SigmaShift.execute(model, 12.0, 3.0), 0)
+        guider = _at(BasicGuider.execute(shifted_model, positive), 0)
+        sampler = _at(KSamplerSelect.execute("res_multistep"), 0)
+        sigmas = _at(BasicScheduler.execute(shifted_model, scheduler, steps, denoise), 0)
+        noise = _at(RandomNoise.execute(int(seed) & 0xFFFFFFFFFFFFFFFF), 0)
+        _hook_progress(guider, steps, report, checkpoint)
+        report("stage2_denoise", 0.30, f"step 0/{steps}")
+        sampled = _at(SamplerCustomAdvanced.execute(noise, guider, sampler, sigmas, latent), 0)
+        report("stage2_denoise", 0.84, f"step {steps}/{steps}")
+        return sampled
+
+    try:
+        return _once()
+    except Exception as exc:
+        if registry is None or not _cuda_oom(exc):
+            raise
+        report("stage2_oom_recover", 0.30, "CUDA OOM — trimming and resuming via pinned block streaming")
+        registry.trim_all_memory()
+        schedule = registry.probe_and_plan("stage2_oom")
+        schedule.stream_from_pinned_ram = True
+        apply_proportional_block_sharding(_unwrap_nn(model), schedule)
+        return _once()
 
 
 def _hook_progress(guider, steps, report, checkpoint):
@@ -571,15 +694,28 @@ def _hook_progress(guider, steps, report, checkpoint):
     guider.sample = sample
 
 
-def _stage3_decode(video_vae, audio_vae, sampled):
+def _stage3_decode(video_vae, audio_vae, sampled, video_dev=None, audio_dev=None, sequential=True, usable_mb=0.0):
     from comfy_extras.nodes_lt import LTXVSeparateAVLatent
     from nodes import VAEDecode
 
+    if video_dev is None:
+        video_dev = torch.device("cpu")
+    if audio_dev is None:
+        audio_dev = video_dev
+    _tighten_video_vae(video_vae, usable_mb)
+    _bind_module_device(video_vae, video_dev)
+    if not sequential:
+        _bind_module_device(audio_vae, audio_dev)
     separated = LTXVSeparateAVLatent.execute(sampled)
-    images = VAEDecode().decode(video_vae, _at(separated, 0))[0]
+    with device_scope(video_dev):
+        images = VAEDecode().decode(video_vae, _at(separated, 0))[0]
     frames_rgb = images.float().clamp(0, 1).cpu()
     del images
-    waveform = _decode_audio(audio_vae, _at(separated, 1)).cpu()
+    if sequential:
+        _unload_device(video_dev)
+        _bind_module_device(audio_vae, audio_dev)
+    with device_scope(audio_dev):
+        waveform = _decode_audio(audio_vae, _at(separated, 1)).cpu()
     return frames_rgb, waveform
 
 

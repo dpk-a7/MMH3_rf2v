@@ -102,14 +102,17 @@ def mark_abort(job_id):
         _interrupt_comfy()
 
 
-def emit(conn, job_id, stage, frac, detail):
+def emit(conn, job_id, stage, frac, detail, gpus=None):
     try:
+        payload = {"stage": stage, "progress": frac, "detail": detail}
+        if gpus:
+            payload["gpus"] = gpus
         write_msg(
             conn,
             {
                 "type": "progress",
                 "job_id": job_id,
-                "payload": {"stage": stage, "progress": frac, "detail": detail},
+                "payload": payload,
             },
         )
     except Exception:
@@ -199,7 +202,7 @@ def coordinator(registry):
             continue
 
         def _progress(stage, frac, detail, _conn=cmd.get("conn"), _job=job_id):
-            emit(_conn, _job, stage, frac, detail)
+            emit(_conn, _job, stage, frac, detail, gpus=registry.latest_telemetry())
 
         with JOBS_LOCK:
             CURRENT_JOB = job_id

@@ -9,6 +9,22 @@ use tokio::time::timeout;
 
 const MAX_FRAME: usize = 64 * 1024 * 1024;
 
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct GpuInfo {
+    pub index: u32,
+    pub name: String,
+    #[serde(default)]
+    pub memory_total_mb: u64,
+    #[serde(default)]
+    pub free_vram_mb: u64,
+    #[serde(default)]
+    pub total_vram_mb: u64,
+    #[serde(default)]
+    pub allocated_weight_pct: f32,
+    #[serde(default)]
+    pub role: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ProgressEvent {
     pub job_id: String,
@@ -17,6 +33,8 @@ pub struct ProgressEvent {
     pub detail: String,
     pub done: bool,
     pub ok: bool,
+    #[serde(default)]
+    pub gpus: Vec<GpuInfo>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -82,6 +100,11 @@ impl IpcClient {
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
+                    let gpus = incoming
+                        .payload
+                        .get("gpus")
+                        .and_then(|value| serde_json::from_value(value.clone()).ok())
+                        .unwrap_or_default();
                     on_progress(ProgressEvent {
                         job_id: job_id.to_string(),
                         stage,
@@ -89,6 +112,7 @@ impl IpcClient {
                         detail,
                         done: false,
                         ok: true,
+                        gpus,
                     });
                 }
                 "result" => return Ok(incoming.payload),

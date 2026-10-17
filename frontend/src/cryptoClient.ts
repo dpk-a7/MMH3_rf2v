@@ -19,6 +19,16 @@ export type EnvelopeResult = {
   error?: string;
 };
 
+export type GpuInfo = {
+  index: number;
+  name: string;
+  memory_total_mb?: number;
+  free_vram_mb?: number;
+  total_vram_mb?: number;
+  allocated_weight_pct?: number;
+  role?: "active_full" | "active_tight_partial" | "bypassed_busy" | string;
+};
+
 export type ProgressEvent = {
   job_id: string;
   stage: string;
@@ -26,6 +36,7 @@ export type ProgressEvent = {
   detail: string;
   done: boolean;
   ok: boolean;
+  gpus?: GpuInfo[];
 };
 
 type HandshakeResponse = {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import {
   SecureClient,
   type EnvelopeResult,
+  type GpuInfo,
   type ProgressEvent,
 } from "./cryptoClient";
 import {
@@ -19,7 +20,17 @@ import { computeAlignedFrames, computeSize } from "./math";
 const DEFAULT_PROMPT =
   "Bold comic-book ink style, crisp outlines, dramatic rim light. Use <Picture 1> and <Picture 2> as identity references.";
 
-type GpuInfo = { index: number; name: string; memory_total_mb: number };
+const ROLE_CLASS: Record<string, string> = {
+  active_full: "border-emerald-700 bg-emerald-500/15 text-emerald-300",
+  active_tight_partial: "border-amber-700 bg-amber-500/15 text-amber-300",
+  bypassed_busy: "border-zinc-700 bg-zinc-800 text-zinc-400",
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  active_full: "full",
+  active_tight_partial: "tight",
+  bypassed_busy: "busy",
+};
 
 export function App() {
   const client = useMemo(() => new SecureClient(), []);
@@ -141,6 +152,9 @@ export function App() {
 
   function handleProgress(event: ProgressEvent) {
     if (activeJob.current && event.job_id !== activeJob.current) return;
+    if (event.gpus && event.gpus.length > 0) {
+      setGpus(event.gpus);
+    }
     setStage(event.stage);
     setProgress(event.progress);
     if (event.detail) {
@@ -179,6 +193,7 @@ export function App() {
             detail: String(m.detail ?? ""),
             done: Boolean(m.done),
             ok: Boolean(m.ok),
+            gpus: Array.isArray(m.gpus) ? (m.gpus as GpuInfo[]) : undefined,
           };
           handleProgress(ev);
         } catch {
@@ -417,19 +432,35 @@ export function App() {
     }
   }
 
-  const gpuLabel =
-    gpus.length === 0 ? "No GPU reported" : gpus.map((gpu) => gpu.name).join(", ");
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight">MiniMax-H3 Ref2VA</h1>
           <p className="text-xs text-zinc-500 mt-1">
             {status}
-            {ready ? ` · ${gpuLabel}` : ""}
             {jobId ? ` · ${jobId.slice(0, 8)}` : ""}
           </p>
+          {ready && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {gpus.length === 0 ? (
+                <span className="text-[11px] text-zinc-500">No GPU reported</span>
+              ) : (
+                gpus.map((gpu) => {
+                  const role = gpu.role || "bypassed_busy";
+                  const pct = Math.round(gpu.allocated_weight_pct ?? 0);
+                  return (
+                    <span
+                      key={gpu.index}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] ${ROLE_CLASS[role] ?? ROLE_CLASS.bypassed_busy}`}
+                    >
+                      GPU{gpu.index} {pct}% {ROLE_LABEL[role] ?? role}
+                    </span>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
         <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
       </header>
