@@ -58,63 +58,126 @@ def collective_abort(local_abort):
     return int(flag.item()) == 1
 
 
+def _split_bounds(total, world, rank):
+    if world <= 1:
+        return 0, total
+    if total % world == 0:
+        local = total // world
+        return rank * local, (rank + 1) * local
+    return (rank * total) // world, ((rank + 1) * total) // world
+
+
 class ColumnParallelLinear(torch.nn.Module):
+    comfy_cast_weights = False
+    weight_function = ()
+    bias_function = ()
+
     def __init__(self, in_features, out_features, world, rank, weight=None, bias=None):
         super().__init__()
-        if out_features % world != 0:
-            raise RuntimeError("column_parallel_shape")
         self.world = world
         self.rank = rank
-        local_out = out_features // world
+        self.in_features = in_features
+        self.full_out_features = out_features
+        self.comfy_cast_weights = False
+        self.weight_function = []
+        self.bias_function = []
         if weight is None:
+            if out_features % world != 0:
+                raise RuntimeError("column_parallel_shape")
+            local_out = out_features // world
+            self.out_features = local_out
             self.weight = torch.nn.Parameter(torch.empty(local_out, in_features))
             torch.nn.init.xavier_uniform_(self.weight)
             self.bias = torch.nn.Parameter(torch.zeros(local_out))
         else:
             sliced = weight.detach().contiguous()
-            if tuple(sliced.shape) != (local_out, in_features):
+            if sliced.ndim != 2 or sliced.shape[1] != in_features or sliced.shape[0] <= 0:
                 raise RuntimeError("column_parallel_shape")
-            self.weight = torch.nn.Parameter(sliced)
+            if out_features % world == 0 and sliced.shape[0] != out_features // world:
+                raise RuntimeError("column_parallel_shape")
+            local_out = sliced.shape[0]
+            self.out_features = local_out
+            self.weight = torch.nn.Parameter(sliced, requires_grad=False)
             if bias is None:
-                self.bias = torch.nn.Parameter(torch.zeros(local_out, dtype=sliced.dtype))
+                self.bias = torch.nn.Parameter(torch.zeros(local_out, dtype=sliced.dtype, device=sliced.device), requires_grad=False)
             else:
-                self.bias = torch.nn.Parameter(bias.detach().contiguous())
+                self.bias = torch.nn.Parameter(bias.detach().contiguous(), requires_grad=False)
 
     def forward(self, inputs):
-        w = self.weight if self.weight.dtype == inputs.dtype else self.weight.to(inputs.dtype)
-        b = self.bias if self.bias.dtype == inputs.dtype else self.bias.to(inputs.dtype)
+        w = self.weight
+        b = self.bias
+        if w.device != inputs.device or w.dtype != inputs.dtype:
+            w = w.to(device=inputs.device, dtype=inputs.dtype, non_blocking=True)
+        for fn in self.weight_function:
+            w = fn(w)
+        if b is not None:
+            if b.device != inputs.device or b.dtype != inputs.dtype:
+                b = b.to(device=inputs.device, dtype=inputs.dtype, non_blocking=True)
+            for fn in self.bias_function:
+                b = fn(b)
         return F.linear(inputs, w, b)
 
 
 class RowParallelLinear(torch.nn.Module):
-    def __init__(self, in_features, out_features, world, rank, weight=None, bias=None):
+    comfy_cast_weights = False
+    weight_function = ()
+    bias_function = ()
+
+    def __init__(self, in_features, out_features, world, rank, weight=None, bias=None, input_start=None, input_end=None):
         super().__init__()
-        if in_features % world != 0:
-            raise RuntimeError("row_parallel_shape")
         self.world = world
         self.rank = rank
-        local_in = in_features // world
+        self.in_features = in_features
+        self.out_features = out_features
+        self.comfy_cast_weights = False
+        self.weight_function = []
+        self.bias_function = []
         if weight is None:
+            if in_features % world != 0:
+                raise RuntimeError("row_parallel_shape")
+            local_in = in_features // world
+            self.local_in_features = local_in
+            self.input_start, self.input_end = rank * local_in, (rank + 1) * local_in
             self.weight = torch.nn.Parameter(torch.empty(out_features, local_in))
             torch.nn.init.xavier_uniform_(self.weight)
             self.bias = torch.nn.Parameter(torch.zeros(out_features))
         else:
             sliced = weight.detach().contiguous()
-            if tuple(sliced.shape) != (out_features, local_in):
+            if sliced.ndim != 2 or sliced.shape[0] != out_features or sliced.shape[1] <= 0:
                 raise RuntimeError("row_parallel_shape")
-            self.weight = torch.nn.Parameter(sliced)
-            if bias is None:
-                self.bias = torch.nn.Parameter(torch.zeros(out_features, dtype=sliced.dtype))
+            if in_features % world == 0 and input_start is None and sliced.shape[1] != in_features // world:
+                raise RuntimeError("row_parallel_shape")
+            self.local_in_features = sliced.shape[1]
+            if input_start is not None and input_end is not None:
+                self.input_start, self.input_end = int(input_start), int(input_end)
             else:
-                self.bias = torch.nn.Parameter(bias.detach().contiguous())
+                self.input_start, self.input_end = _split_bounds(in_features, world, rank)
+            self.weight = torch.nn.Parameter(sliced, requires_grad=False)
+            if bias is None:
+                self.bias = torch.nn.Parameter(torch.zeros(out_features, dtype=sliced.dtype, device=sliced.device), requires_grad=False)
+            else:
+                self.bias = torch.nn.Parameter(bias.detach().contiguous(), requires_grad=False)
 
     def forward(self, inputs):
-        w = self.weight if self.weight.dtype == inputs.dtype else self.weight.to(inputs.dtype)
-        b = self.bias if self.bias.dtype == inputs.dtype else self.bias.to(inputs.dtype)
-        local = F.linear(inputs, w, None)
+        x = inputs
+        if x.shape[-1] == self.in_features and self.local_in_features != self.in_features:
+            x = x[..., self.input_start : self.input_end].contiguous()
+        w = self.weight
+        b = self.bias
+        if w.device != x.device or w.dtype != x.dtype:
+            w = w.to(device=x.device, dtype=x.dtype, non_blocking=True)
+        for fn in self.weight_function:
+            w = fn(w)
+        local = F.linear(x, w, None)
         if self.world > 1 and CTX.active():
             dist.all_reduce(local)
-        return local + b
+        if b is not None:
+            if b.device != local.device or b.dtype != local.dtype:
+                b = b.to(device=local.device, dtype=local.dtype, non_blocking=True)
+            for fn in self.bias_function:
+                b = fn(b)
+            return local + b
+        return local
 
 
 def ulysses_attention(q, k, v, attend_fn):
@@ -123,14 +186,19 @@ def ulysses_attention(q, k, v, attend_fn):
         return attend_fn(q, k, v)
     world = CTX.world
     heads = q.shape[1]
-    if heads % world != 0:
-        return attend_fn(q, k, v)
+    pad_h = (world - (heads % world)) % world
+    if pad_h:
+        q = F.pad(q, (0, 0, 0, 0, 0, pad_h))
+        k = F.pad(k, (0, 0, 0, 0, 0, pad_h))
+        v = F.pad(v, (0, 0, 0, 0, 0, pad_h))
     q, k, v, pad = _shard_sequence(q, k, v, world)
     q = _seq_to_head(q, world)
     k = _seq_to_head(k, world)
     v = _seq_to_head(v, world)
     attended = attend_fn(q, k, v)
     attended = _head_to_seq(attended, world)
+    if pad_h:
+        attended = attended[:, :heads, :, :]
     attended = _gather_sequence(attended, world)
     if pad:
         attended = attended[:, :, : attended.shape[2] - pad, :]
@@ -310,14 +378,14 @@ def slice_qkv_out(weight, world, rank):
     out, _inn = weight.shape
     if world <= 1:
         return weight.contiguous()
-    if out % 3 != 0 or (out // 3) % world != 0:
+    if out % 3 != 0 or (out // 3) < world:
         raise RuntimeError("column_parallel_shape")
     third = out // 3
-    local = third // world
+    start, end = _split_bounds(third, world, rank)
     parts = []
     for block in range(3):
-        base = block * third + rank * local
-        parts.append(weight[base : base + local])
+        base = block * third
+        parts.append(weight[base + start : base + end])
     return torch.cat(parts, dim=0).contiguous()
 
 
@@ -326,12 +394,12 @@ def slice_gate_up(weight, world, rank):
     out, _inn = weight.shape
     if world <= 1:
         return weight.contiguous()
-    if out % 2 != 0 or (out // 2) % world != 0:
+    if out % 2 != 0 or (out // 2) < world:
         raise RuntimeError("column_parallel_shape")
     half = out // 2
-    local = half // world
-    gate = weight[rank * local : (rank + 1) * local]
-    up = weight[half + rank * local : half + (rank + 1) * local]
+    start, end = _split_bounds(half, world, rank)
+    gate = weight[start:end]
+    up = weight[half + start : half + end]
     return torch.cat([gate, up], dim=0).contiguous()
 
 
@@ -339,10 +407,10 @@ def slice_row(weight, world, rank):
     _out, inn = weight.shape
     if world <= 1:
         return weight.contiguous()
-    if inn % world != 0:
+    if inn < world:
         raise RuntimeError("row_parallel_shape")
-    local = inn // world
-    return weight[:, rank * local : (rank + 1) * local].contiguous()
+    start, end = _split_bounds(inn, world, rank)
+    return weight[:, start:end].contiguous()
 
 
 def _slice_paired_bias(bias, out_features, world, rank, parts):
@@ -353,18 +421,18 @@ def _slice_paired_bias(bias, out_features, world, rank, parts):
     if bias.numel() != out_features or out_features % parts != 0:
         return None
     span = out_features // parts
-    if span % world != 0:
+    if span < world:
         return None
-    local = span // world
+    start, end = _split_bounds(span, world, rank)
     chunks = []
     for block in range(parts):
-        base = block * span + rank * local
-        chunks.append(bias[base : base + local])
+        base = block * span
+        chunks.append(bias[base + start : base + end])
     return torch.cat(chunks, dim=0).contiguous()
 
 
 def attach_tensor_parallel(root, world, rank):
-    """Replace DiT and Qwen3-VL QKV / O projections and SwiGLU linears with checkpoint-sliced parallel layers."""
+    """Replace DiT and Qwen3-VL QKV / O projections and SwiGLU/FFN linears with checkpoint-sliced parallel layers."""
     world = max(1, int(world))
     rank = int(rank)
     for module in root.modules():
@@ -379,10 +447,14 @@ def attach_tensor_parallel(root, world, rank):
             and hasattr(module, "num_kv_heads")
         ):
             _shard_llama_attention(module, world, rank)
+        elif hasattr(module, "to_q") and hasattr(module, "to_k") and hasattr(module, "to_v") and hasattr(module, "to_out"):
+            _shard_comfy_cross_attention(module, world, rank)
         elif module.__class__.__name__ == "MLP" and hasattr(module, "fc1") and hasattr(module, "fc2"):
             _shard_swiglu(module, world, rank)
         elif hasattr(module, "gate_proj") and hasattr(module, "up_proj") and hasattr(module, "down_proj"):
             _shard_llama_swiglu(module, world, rank)
+        elif module.__class__.__name__ == "FeedForward" and hasattr(module, "net"):
+            _shard_comfy_feedforward(module, world, rank)
 
 
 def _shard_attention(attn, world, rank):
@@ -390,27 +462,47 @@ def _shard_attention(attn, world, rank):
     out_w, out_b = _dense_weight(attn.out_proj)
     if qkv_w is None or out_w is None:
         return
+    heads = int(getattr(attn, "heads", 1))
+    third = qkv_w.shape[0] // 3 if qkv_w.shape[0] % 3 == 0 else 0
+    if world > 1 and heads >= world and third > 0 and third % heads == 0:
+        head_dim = third // heads
+        h_start, h_end = _split_bounds(heads, world, rank)
+        in_start, in_end = h_start * head_dim, h_end * head_dim
+        qkv_parts = [qkv_w[b * third + in_start : b * third + in_end] for b in range(3)]
+        qkv_sliced = torch.cat(qkv_parts, dim=0).contiguous()
+        if qkv_b is not None and qkv_b.numel() == qkv_w.shape[0]:
+            b_parts = [qkv_b[b * third + in_start : b * third + in_end] for b in range(3)]
+            qkv_bias = torch.cat(b_parts, dim=0).contiguous()
+        else:
+            qkv_bias = None
+        out_sliced = out_w[:, in_start:in_end].contiguous()
+        attn.heads = h_end - h_start
+    else:
+        in_start, in_end = _split_bounds(out_w.shape[1], world, rank)
+        qkv_sliced = slice_qkv_out(qkv_w, world, rank)
+        qkv_bias = _slice_paired_bias(qkv_b, qkv_w.shape[0], world, rank, 3)
+        out_sliced = slice_row(out_w, world, rank)
     qkv = ColumnParallelLinear(
         qkv_w.shape[1],
         qkv_w.shape[0],
         world,
         rank,
-        weight=slice_qkv_out(qkv_w, world, rank),
-        bias=_slice_paired_bias(qkv_b, qkv_w.shape[0], world, rank, 3),
+        weight=qkv_sliced,
+        bias=qkv_bias,
     )
     proj = RowParallelLinear(
         out_w.shape[1],
         out_w.shape[0],
         world,
         rank,
-        weight=slice_row(out_w, world, rank),
+        weight=out_sliced,
         bias=out_b,
+        input_start=in_start,
+        input_end=in_end,
     )
     attn.qkv_proj = qkv
     attn.out_proj = proj
     attn.o_proj = proj
-    if world > 1 and int(attn.heads) % world == 0:
-        attn.heads = int(attn.heads) // world
 
 
 def _shard_swiglu(mlp, world, rank):
@@ -418,6 +510,9 @@ def _shard_swiglu(mlp, world, rank):
     down_w, down_b = _dense_weight(mlp.fc2)
     if up_w is None or down_w is None:
         return
+    if up_w.shape[0] % 2 != 0 or (up_w.shape[0] // 2) < world or down_w.shape[1] < world:
+        return
+    in_start, in_end = _split_bounds(down_w.shape[1], world, rank)
     gate_up = ColumnParallelLinear(
         up_w.shape[1],
         up_w.shape[0],
@@ -433,6 +528,8 @@ def _shard_swiglu(mlp, world, rank):
         rank,
         weight=slice_row(down_w, world, rank),
         bias=down_b,
+        input_start=in_start,
+        input_end=in_end,
     )
     mlp.fc1 = gate_up
     mlp.gate_up_proj = gate_up
@@ -451,7 +548,7 @@ def _shard_llama_attention(attn, world, rank):
         return
     num_heads = int(getattr(attn, "num_heads", 0))
     num_kv_heads = int(getattr(attn, "num_kv_heads", 0))
-    if num_heads <= 0 or num_kv_heads <= 0 or num_heads % world != 0 or num_kv_heads % world != 0:
+    if num_heads <= 0 or num_kv_heads <= 0 or num_kv_heads < world or num_heads % num_kv_heads != 0:
         return
     q_w, q_b = _dense_weight(attn.q_proj)
     k_w, k_b = _dense_weight(attn.k_proj)
@@ -459,44 +556,53 @@ def _shard_llama_attention(attn, world, rank):
     o_w, o_b = _dense_weight(attn.o_proj)
     if q_w is None or k_w is None or v_w is None or o_w is None:
         return
-    if q_w.shape[0] % world != 0 or k_w.shape[0] % world != 0 or v_w.shape[0] % world != 0 or o_w.shape[1] % world != 0:
+    if q_w.shape[0] % num_heads != 0 or k_w.shape[0] % num_kv_heads != 0 or v_w.shape[0] % num_kv_heads != 0:
         return
-    q_local = q_w.shape[0] // world
-    kv_local = k_w.shape[0] // world
+    group = num_heads // num_kv_heads
+    q_head_dim = q_w.shape[0] // num_heads
+    kv_head_dim = k_w.shape[0] // num_kv_heads
+    kv_start, kv_end = _split_bounds(num_kv_heads, world, rank)
+    h_start, h_end = kv_start * group, kv_end * group
+    q_start, q_end = h_start * q_head_dim, h_end * q_head_dim
+    k_start, k_end = kv_start * kv_head_dim, kv_end * kv_head_dim
+    if o_w.shape[1] != q_w.shape[0]:
+        return
     attn.q_proj = ColumnParallelLinear(
         q_w.shape[1],
         q_w.shape[0],
         world,
         rank,
-        weight=q_w[rank * q_local : (rank + 1) * q_local].contiguous(),
-        bias=q_b[rank * q_local : (rank + 1) * q_local].contiguous() if q_b is not None else None,
+        weight=q_w[q_start:q_end].contiguous(),
+        bias=q_b[q_start:q_end].contiguous() if q_b is not None else None,
     )
     attn.k_proj = ColumnParallelLinear(
         k_w.shape[1],
         k_w.shape[0],
         world,
         rank,
-        weight=k_w[rank * kv_local : (rank + 1) * kv_local].contiguous(),
-        bias=k_b[rank * kv_local : (rank + 1) * kv_local].contiguous() if k_b is not None else None,
+        weight=k_w[k_start:k_end].contiguous(),
+        bias=k_b[k_start:k_end].contiguous() if k_b is not None else None,
     )
     attn.v_proj = ColumnParallelLinear(
         v_w.shape[1],
         v_w.shape[0],
         world,
         rank,
-        weight=v_w[rank * kv_local : (rank + 1) * kv_local].contiguous(),
-        bias=v_b[rank * kv_local : (rank + 1) * kv_local].contiguous() if v_b is not None else None,
+        weight=v_w[k_start:k_end].contiguous(),
+        bias=v_b[k_start:k_end].contiguous() if v_b is not None else None,
     )
     attn.o_proj = RowParallelLinear(
         o_w.shape[1],
         o_w.shape[0],
         world,
         rank,
-        weight=slice_row(o_w, world, rank),
+        weight=o_w[:, q_start:q_end].contiguous(),
         bias=o_b,
+        input_start=q_start,
+        input_end=q_end,
     )
-    attn.num_heads = num_heads // world
-    attn.num_kv_heads = num_kv_heads // world
+    attn.num_heads = h_end - h_start
+    attn.num_kv_heads = kv_end - kv_start
 
 
 def _shard_llama_swiglu(mlp, world, rank):
@@ -507,8 +613,9 @@ def _shard_llama_swiglu(mlp, world, rank):
     d_w, d_b = _dense_weight(mlp.down_proj)
     if g_w is None or u_w is None or d_w is None:
         return
-    if g_w.shape[0] != u_w.shape[0] or g_w.shape[0] % world != 0 or d_w.shape[1] % world != 0:
+    if g_w.shape[0] != u_w.shape[0] or g_w.shape[0] < world or d_w.shape[1] < world:
         return
+    in_start, in_end = _split_bounds(d_w.shape[1], world, rank)
     combined_w = torch.cat([g_w, u_w], dim=0)
     combined_b = torch.cat([g_b, u_b], dim=0) if (g_b is not None and u_b is not None) else None
     gate_up = ColumnParallelLinear(
@@ -526,7 +633,11 @@ def _shard_llama_swiglu(mlp, world, rank):
         rank,
         weight=slice_row(d_w, world, rank),
         bias=d_b,
+        input_start=in_start,
+        input_end=in_end,
     )
+    mlp.gate_proj = None
+    mlp.up_proj = None
     mlp.gate_up_proj = gate_up
     mlp.down_proj = down
     act = getattr(mlp, "activation", F.silu)
@@ -536,6 +647,81 @@ def _shard_llama_swiglu(mlp, world, rank):
         return self.down_proj(act(gate) * up)
 
     mlp.forward = forward.__get__(mlp, mlp.__class__)
+
+
+def _shard_comfy_feedforward(ff, world, rank):
+    if world <= 1:
+        return
+    net = getattr(ff, "net", None)
+    if not isinstance(net, torch.nn.Sequential) or len(net) < 3 or not hasattr(net[0], "proj"):
+        return
+    up_w, up_b = _dense_weight(net[0].proj)
+    down_w, down_b = _dense_weight(net[2])
+    if up_w is None or down_w is None or up_w.shape[0] < world or down_w.shape[1] < world:
+        return
+    start, end = _split_bounds(up_w.shape[0], world, rank)
+    net[0].proj = ColumnParallelLinear(
+        up_w.shape[1],
+        up_w.shape[0],
+        world,
+        rank,
+        weight=up_w[start:end].contiguous(),
+        bias=up_b[start:end].contiguous() if up_b is not None else None,
+    )
+    net[2] = RowParallelLinear(
+        down_w.shape[1],
+        down_w.shape[0],
+        world,
+        rank,
+        weight=down_w[:, start:end].contiguous(),
+        bias=down_b,
+        input_start=start,
+        input_end=end,
+    )
+
+
+def _shard_comfy_cross_attention(attn, world, rank):
+    if world <= 1:
+        return
+    for name in ("to_q", "to_k", "to_v"):
+        layer = getattr(attn, name, None)
+        if layer is None or isinstance(layer, (ColumnParallelLinear, RowParallelLinear)):
+            continue
+        w, b = _dense_weight(layer)
+        if w is None or w.shape[1] < world:
+            continue
+        start, end = _split_bounds(w.shape[1], world, rank)
+        setattr(
+            attn,
+            name,
+            RowParallelLinear(
+                w.shape[1],
+                w.shape[0],
+                world,
+                rank,
+                weight=w[:, start:end].contiguous(),
+                bias=b,
+                input_start=start,
+                input_end=end,
+            ),
+        )
+    to_out = getattr(attn, "to_out", None)
+    if isinstance(to_out, torch.nn.Sequential) and len(to_out) > 0:
+        layer = to_out[0]
+        if not isinstance(layer, (ColumnParallelLinear, RowParallelLinear)):
+            w, b = _dense_weight(layer)
+            if w is not None and w.shape[1] >= world:
+                start, end = _split_bounds(w.shape[1], world, rank)
+                to_out[0] = RowParallelLinear(
+                    w.shape[1],
+                    w.shape[0],
+                    world,
+                    rank,
+                    weight=w[:, start:end].contiguous(),
+                    bias=b,
+                    input_start=start,
+                    input_end=end,
+                )
 
 
 def attach_ulysses(model_patcher):

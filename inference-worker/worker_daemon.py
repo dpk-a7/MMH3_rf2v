@@ -6,15 +6,6 @@ import sys
 import threading
 
 logging.disable(logging.CRITICAL)
-try:
-    _NULL_OUT = open(os.devnull, "w", encoding="utf-8")
-    _NULL_ERR = open(os.devnull, "w", encoding="utf-8")
-    sys.stdout = _NULL_OUT
-    sys.stderr = _NULL_ERR
-except OSError:
-    _NULL_OUT = None
-    _NULL_ERR = None
-
 os.environ.setdefault("PYTHONWARNINGS", "ignore")
 
 import msgpack
@@ -39,10 +30,29 @@ def init_parallel():
     CTX.rank = rank
     CTX.world = world
     CTX.local_rank = local
+    cores = os.cpu_count() or 8
+    threads = max(2, min(16, cores // max(1, world * 2)))
+    for env_key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        os.environ.setdefault(env_key, str(threads))
+    try:
+        torch.set_num_threads(threads)
+    except Exception:
+        pass
     if torch.cuda.is_available():
         torch.cuda.set_device(local)
         torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
+        if hasattr(torch.backends.cuda.matmul, "allow_fp16_reduced_precision_reduction"):
+            torch.backends.cuda.matmul.allow_fp16_reduced_precision_reduction = True
+        if hasattr(torch.backends.cuda.matmul, "allow_bf16_reduced_precision_reduction"):
+            torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = True
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high")
+        for sdp_fn in ("enable_flash_sdp", "enable_mem_efficient_sdp", "enable_math_sdp"):
+            fn = getattr(torch.backends.cuda, sdp_fn, None)
+            if callable(fn):
+                fn(True)
         CTX.device = torch.device(f"cuda:{local}")
     else:
         CTX.device = torch.device("cpu")
@@ -63,6 +73,38 @@ def resolve_model_root():
         return "/app/model"
     here = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "model"))
     return here
+
+
+def select_optimal_gpus():
+    """Return (csv_devices, count) skipping GPUs heavily occupied by external workloads."""
+    preset = (os.environ.get("CUDA_VISIBLE_DEVICES") or "").strip()
+    if preset and preset.lower() not in ("all", "none", "-1"):
+        devs = [d.strip() for d in preset.split(",") if d.strip()]
+        if devs:
+            return ",".join(devs), len(devs)
+    import subprocess
+
+    rows = []
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        for line in proc.stdout.decode("ascii", "ignore").splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) >= 3:
+                rows.append((parts[0], float(parts[1]), float(parts[2])))
+    except Exception:
+        rows = []
+    if not rows:
+        return "0", 1
+    healthy = [idx for idx, total, free in rows if free >= max(8192.0, total * 0.40)]
+    if healthy:
+        return ",".join(healthy), len(healthy)
+    best = max(rows, key=lambda item: item[2])[0]
+    return str(best), 1
 
 
 def sock_path():
@@ -243,6 +285,13 @@ def follower(registry):
 
 
 def main():
+    try:
+        null_out = open(os.devnull, "w", encoding="utf-8")
+        null_err = open(os.devnull, "w", encoding="utf-8")
+        sys.stdout = null_out
+        sys.stderr = null_err
+    except OSError:
+        pass
     init_parallel()
     registry = PinnedModelRegistry(resolve_model_root())
     if CTX.rank != 0:

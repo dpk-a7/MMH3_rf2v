@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from memory_manager import PinnedModelRegistry, can_pin_bytes, vram_budget_bytes
 from parallel_shard import (
     CTX,
     attach_tensor_parallel,
@@ -33,7 +34,7 @@ class MuxFailed(Exception):
 
 
 class ComfyPinned:
-    """ComfyUI model object moved with the 3-stage pinned-RAM registry."""
+    """ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-style lowvram budgeting."""
 
     def __init__(self, obj):
         self.obj = obj
@@ -46,23 +47,120 @@ class ComfyPinned:
         if hasattr(self.obj, "device"):
             self.obj.device = target
         patcher = _patcher(self.obj)
-        if patcher is not None:
-            if target.type == "cpu":
+        if target.type == "cpu":
+            if patcher is not None:
                 _call_patcher(patcher, "unpatch_model", target)
-            else:
-                patcher.load_device = target
-                _call_patcher(patcher, "patch_model", target)
-            _pin_tree(patcher)
+            for module in _iter_modules(self.obj):
+                if hasattr(module, "comfy_cast_weights"):
+                    module.comfy_cast_weights = False
+                module.to(target)
+                _pin_module(module)
         else:
-            for module in _iter_modules(self.obj):
-                module.to(target)
-                if target.type == "cpu":
-                    _pin_module(module)
-        if target.type != "cpu":
-            for module in _iter_modules(self.obj):
-                module.to(target)
+            total_b = _model_bytes(self.obj)
+            budget_b = vram_budget_bytes(target)
+            full_load = (budget_b <= 0) or (total_b <= budget_b)
+            if patcher is not None:
+                patcher.load_device = target
+                _call_patcher_load(patcher, target, budget_b, full_load)
+            _move_modules_budgeted(self.obj, target, budget_b, full_load)
         if torch.cuda.is_available():
             torch.cuda.synchronize()
+
+
+def _model_bytes(obj):
+    seen = set()
+    total = 0
+    for module in _iter_modules(obj):
+        for param in module.parameters(recurse=False):
+            if id(param) not in seen:
+                seen.add(id(param))
+                total += param.numel() * param.element_size()
+        for buf in module.buffers(recurse=False):
+            if id(buf) not in seen:
+                seen.add(id(buf))
+                total += buf.numel() * buf.element_size()
+    return total
+
+
+def _module_own_bytes(module):
+    total = 0
+    for param in module.parameters(recurse=False):
+        total += param.numel() * param.element_size()
+    for buf in module.buffers(recurse=False):
+        total += buf.numel() * buf.element_size()
+    return total
+
+
+def _call_patcher_load(patcher, target, budget_b, full_load):
+    method = getattr(patcher, "patch_model", None)
+    if method is None:
+        return
+    if not full_load and budget_b > 0:
+        try:
+            method(device_to=target, lowvram_model_memory=int(budget_b), load_weights=True)
+            return
+        except (TypeError, AssertionError):
+            pass
+        except RuntimeError as exc:
+            if "out of memory" in str(exc).lower() and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                return
+            raise
+    try:
+        _call_patcher(patcher, "patch_model", target)
+    except AssertionError:
+        try:
+            import comfy.model_management as mm
+
+            mm.load_models_gpu([patcher])
+        except Exception:
+            pass
+    except RuntimeError as exc:
+        if "out of memory" in str(exc).lower() and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        else:
+            raise
+
+
+def _move_modules_budgeted(obj, target, budget_b, full_load):
+    used_b = 0
+    stream_rest = not full_load
+    for module in _iter_modules(obj):
+        own_b = _module_own_bytes(module)
+        if own_b == 0:
+            continue
+        castable = hasattr(module, "comfy_cast_weights")
+        if not stream_rest:
+            try:
+                if castable:
+                    module.comfy_cast_weights = False
+                module.to(target)
+                used_b += own_b
+                continue
+            except RuntimeError as exc:
+                if "out of memory" in str(exc).lower() and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    stream_rest = True
+                else:
+                    raise
+        if castable and (used_b + own_b > budget_b > 0):
+            module.to("cpu")
+            module.comfy_cast_weights = True
+            _pin_module(module)
+        else:
+            try:
+                if castable:
+                    module.comfy_cast_weights = False
+                module.to(target)
+                used_b += own_b
+            except RuntimeError as exc:
+                if "out of memory" in str(exc).lower() and castable and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    module.to("cpu")
+                    module.comfy_cast_weights = True
+                    _pin_module(module)
+                else:
+                    raise
 
 
 def _call_patcher(patcher, name, device):
@@ -91,10 +189,10 @@ def _iter_modules(obj):
     while stack:
         current = stack.pop()
         if isinstance(current, torch.nn.Module):
-            if id(current) in seen:
-                continue
-            seen.add(id(current))
-            yield current
+            for sub in current.modules():
+                if id(sub) not in seen:
+                    seen.add(id(sub))
+                    yield sub
         if current is None or isinstance(current, (str, bytes, int, float)):
             continue
         for name in ("patcher", "model", "cond_stage_model", "first_stage_model", "diffusion_model"):
@@ -113,7 +211,11 @@ def _pin_module(module):
         return
     for param in module.parameters():
         if param.device.type == "cpu" and param.is_floating_point() and not param.is_pinned():
-            param.data = param.data.pin_memory()
+            if can_pin_bytes(param.numel() * param.element_size()):
+                try:
+                    param.data = param.data.pin_memory()
+                except RuntimeError:
+                    return
 
 
 def _dit(model):
@@ -185,7 +287,13 @@ def _load_clip(path):
     from nodes import CLIPLoader
 
     clip = CLIPLoader().load_clip(_rel_model_name(path, "clip"), type="minimax", device="cpu")[0]
-    return ComfyPinned(clip)
+    world = CTX.world if CTX.active() else 1
+    if world > 1:
+        attach_tensor_parallel(clip, world, CTX.rank)
+        PinnedModelRegistry.trim_all_memory()
+    pinned = ComfyPinned(clip)
+    pinned.parallel = world > 1
+    return pinned
 
 
 def _load_vae(path):
@@ -200,6 +308,27 @@ def _load_unet(path):
 
     model = UNETLoader().load_unet(_rel_model_name(path, "diffussion"), "default")[0]
     return ComfyPinned(model)
+
+
+def _shard_diffusion_on_cpu(pinned, world):
+    if pinned.parallel:
+        return
+    patcher = _patcher(pinned.obj)
+    if patcher is not None and getattr(patcher, "patches", None):
+        try:
+            _call_patcher(patcher, "patch_model", torch.device("cpu"))
+            patcher.patches.clear()
+            if hasattr(patcher, "backup") and isinstance(patcher.backup, dict):
+                patcher.backup.clear()
+        except Exception:
+            pass
+    if world > 1:
+        attach_tensor_parallel(_dit(pinned.obj), world, CTX.rank)
+        PinnedModelRegistry.trim_all_memory()
+    attach_ulysses(pinned.obj)
+    _watch_steps(_dit(pinned.obj))
+    _pin_tree(pinned.obj)
+    pinned.parallel = True
 
 
 def _load_controlnet(path):
@@ -301,10 +430,12 @@ def run_job(payload, registry, progress, abort_event):
 
             loaded["lora"] = registry.get_or_swap("lora", "lora", models["lora"], _load_lora)
             active_diffusion = loaded["lora"]
+            _shard_diffusion_on_cpu(active_diffusion, world)
         else:
             registry.loaded_slots["lora"]["filename"] = None
             registry.loaded_slots["lora"]["module"] = None
             registry.loaded_slots["lora"]["weights"] = None
+            _shard_diffusion_on_cpu(active_diffusion, world)
         if cn_cfg.get("enabled") and models.get("controlnet"):
             loaded["controlnet"] = registry.get_or_swap(
                 "controlnet", "controlnet", models["controlnet"], _load_controlnet
@@ -618,7 +749,6 @@ def _hook_progress(guider, steps, report, checkpoint):
 
 def _stage3_decode(registry, loaded, sampled, device, world):
     from comfy_extras.nodes_lt import LTXVSeparateAVLatent
-    from nodes import VAEDecode
 
     separated = LTXVSeparateAVLatent.execute(sampled)
     video_latent = _at(separated, 0)
@@ -629,7 +759,7 @@ def _stage3_decode(registry, loaded, sampled, device, world):
         registry.activate(["video_vae"], device)
         _force_dtype(loaded["video_vae"], torch.float16)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
-            images = VAEDecode().decode(loaded["video_vae"].obj, video_latent)[0]
+            images = _decode_video_safe(loaded["video_vae"].obj, video_latent)
         frames_rgb = images.float().clamp(0, 1)
         registry.offload(["video_vae"])
         registry.activate(["audio_vae"], device)
@@ -641,7 +771,7 @@ def _stage3_decode(registry, loaded, sampled, device, world):
         registry.activate(["video_vae"], device)
         _force_dtype(loaded["video_vae"], torch.float16)
         with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
-            images = VAEDecode().decode(loaded["video_vae"].obj, video_latent)[0]
+            images = _decode_video_safe(loaded["video_vae"].obj, video_latent)
         frames_rgb = images.float().clamp(0, 1)
     elif CTX.rank == 1:
         registry.activate(["audio_vae"], device)
@@ -649,6 +779,26 @@ def _stage3_decode(registry, loaded, sampled, device, world):
         with torch.autocast(device_type=device.type, enabled=False):
             waveform = _decode_audio(loaded["audio_vae"].obj, audio_latent)
     return frames_rgb, waveform
+
+
+def _decode_video_safe(vae, video_latent):
+    from nodes import VAEDecode
+
+    try:
+        return VAEDecode().decode(vae, video_latent)[0]
+    except RuntimeError as exc:
+        if "out of memory" not in str(exc).lower():
+            raise
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        try:
+            from nodes import VAEDecodeTiled
+
+            return VAEDecodeTiled().decode(vae, video_latent, 512, 64, 64, 8)[0]
+        except Exception:
+            if hasattr(vae, "decode_tiled"):
+                return vae.decode_tiled(video_latent["samples"])
+            raise
 
 
 def _decode_audio(vae, audio_latent):
@@ -739,6 +889,12 @@ def _load_video(path, width, height, target_frames):
     return F.interpolate(frames, size=(height, width), mode="bilinear", align_corners=False)
 
 
+def _ffmpeg_threads():
+    cores = os.cpu_count() or 8
+    world = max(1, int(getattr(CTX, "world", 1)))
+    return str(max(2, min(8, cores // max(1, world * 2))))
+
+
 def _load_video_native(path, target_frames):
     real = _require_media(path)
     probed = _ffprobe_size(real)
@@ -751,6 +907,8 @@ def _load_video_native(path, target_frames):
             "-hide_banner",
             "-loglevel",
             "error",
+            "-threads",
+            _ffmpeg_threads(),
             "-i",
             real,
             "-an",
@@ -923,6 +1081,8 @@ def _mux(frames_rgb, waveform, width, height, fps, output_path):
         "+bitexact",
         "-c:v",
         "libx264",
+        "-threads",
+        _ffmpeg_threads(),
         "-pix_fmt",
         "yuv420p",
         "-crf",

@@ -20,7 +20,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=4G,mode=1777
-      - /dev/shm:size=16G,mode=1777
+      - /dev/shm:size=32G,mode=1777
       - /app/ephemeral:size=32G,mode=0700
     volumes:
       - ./model/diffussion:/app/model/diffussion:ro

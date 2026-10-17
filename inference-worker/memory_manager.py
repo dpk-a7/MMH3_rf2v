@@ -177,8 +177,61 @@ def read_tensors(path):
 
 def _pin(tensor):
     if torch.cuda.is_available() and tensor.device.type == "cpu" and not tensor.is_pinned():
-        return tensor.pin_memory()
+        if can_pin_bytes(tensor.numel() * tensor.element_size()):
+            try:
+                return tensor.pin_memory()
+            except RuntimeError:
+                return tensor
     return tensor
+
+
+def host_ram_info():
+    """Return (available_bytes, total_bytes) from /proc/meminfo with safe fallback."""
+    avail = 0
+    total = 0
+    try:
+        with open("/proc/meminfo", "r", encoding="ascii", errors="ignore") as handle:
+            for line in handle:
+                if line.startswith("MemAvailable:"):
+                    avail = int(line.split()[1]) * 1024
+                elif line.startswith("MemTotal:"):
+                    total = int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    if total <= 0:
+        total = 64 * (1024 ** 3)
+    if avail <= 0:
+        avail = total // 2
+    return avail, total
+
+
+def can_pin_bytes(nbytes):
+    """ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned."""
+    avail, total = host_ram_info()
+    reserve = max(8 * (1024 ** 3), int(total * 0.12))
+    return (avail - reserve) > int(nbytes)
+
+
+def vram_budget_bytes(device=None):
+    """ComfyUI-style usable VRAM budget for model weights on `device`."""
+    if not torch.cuda.is_available():
+        return 0
+    try:
+        dev = device if device is not None else torch.cuda.current_device()
+        if isinstance(dev, torch.device) and dev.type != "cuda":
+            return 0
+        free_b, total_b = torch.cuda.mem_get_info(dev)
+    except Exception:
+        return 0
+    reserve_mb = os.environ.get("MMH3_RESERVE_VRAM_MB")
+    if reserve_mb is not None:
+        try:
+            reserve = max(512 * (1024 ** 2), int(float(reserve_mb) * (1024 ** 2)))
+        except ValueError:
+            reserve = int(max(1200 * (1024 ** 2), min(3072 * (1024 ** 2), total_b * 0.15)))
+    else:
+        reserve = int(max(1200 * (1024 ** 2), min(3072 * (1024 ** 2), total_b * 0.15)))
+    return max(64 * (1024 ** 2), int(free_b - reserve))
 
 
 def _stable_slot(key):
