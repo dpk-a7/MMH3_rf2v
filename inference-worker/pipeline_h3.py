@@ -54,19 +54,25 @@ def check_host_gate(width, height, frames):
 def check_vram_gate(model, positive, latent, device):
     """Activations cannot be streamed like weights: they must fit on the DiT GPU.
 
-    Uses ComfyUI's own batch-1 estimate, which includes the reference-latent conditioning.
+    Uses ComfyUI's own batch-1 estimate on the flat-packed AV latent plus reference conditioning.
     """
     if device.type != "cuda":
         return
     import comfy.model_management as mm
     import comfy.sampler_helpers as helpers
 
-    shape = getattr(latent.get("samples"), "shape", None)
-    if shape is None:
+    samples = latent.get("samples")
+    if samples is None:
+        return
+    if hasattr(samples, "unbind"):
+        packed_shape = [1, 1, sum(int(t.numel()) for t in samples.unbind())]
+    elif hasattr(samples, "shape"):
+        packed_shape = list(samples.shape)
+    else:
         return
     try:
         conds = {"positive": helpers.convert_cond(positive)}
-        _full, minimum = helpers.estimate_memory(model, list(shape), conds)
+        _full, minimum = helpers.estimate_memory(model, packed_shape, conds)
         need = int(minimum + mm.minimum_inference_memory())
     except Exception:
         return
@@ -76,9 +82,98 @@ def check_vram_gate(model, positive, latent, device):
 
 
 def _force_dtype(vae, dtype):
+    import comfy.model_management as mm
+
     vae.vae_dtype = dtype
     vae.first_stage_model.to(dtype=dtype)
+    mm.archive_model_dtypes(vae.first_stage_model)
     return vae
+
+
+def _patch_psutil_cgroup():
+    try:
+        import psutil
+
+        if getattr(psutil, "_mmh3_patched", False):
+            return
+        orig = psutil.virtual_memory
+
+        def _virtual_memory():
+            vm = orig()
+            avail, total = host_ram_info()
+            if total < vm.total or avail < vm.available:
+                return vm._replace(total=min(vm.total, total), available=min(vm.available, avail))
+            return vm
+
+        psutil.virtual_memory = _virtual_memory
+        psutil._mmh3_patched = True
+    except Exception:
+        return
+
+
+def _patch_minimax_model():
+    import importlib
+
+    try:
+        mb = importlib.import_module("comfy.model_base")
+        cls = getattr(mb, "MiniMaxH3", None)
+        if cls is not None and not getattr(cls, "_mmh3_patched", False):
+            cls.memory_usage_factor_conds = ("minimax_cond",)
+
+            def _extra_conds_shapes(self, **kwargs):
+                elems = 0
+                cross = kwargs.get("cross_attn")
+                if hasattr(cross, "shape") and cross.ndim >= 2:
+                    elems += int(cross.shape[1]) * 96
+                for r in kwargs.get("minimax_refs") or ():
+                    lat = r.get("latent")
+                    if hasattr(lat, "numel"):
+                        elems += int(lat.numel())
+                    elems += int(r.get("ref_audio_t") or 0) * 2 * 96
+                for kf in kwargs.get("minimax_keyframes") or ():
+                    lat = kf.get("latent")
+                    if hasattr(lat, "numel"):
+                        elems += int(lat.numel())
+                return {"minimax_cond": [1, 1, elems]} if elems > 0 else {}
+
+            cls.extra_conds_shapes = _extra_conds_shapes
+            cls._mmh3_patched = True
+    except Exception:
+        pass
+    try:
+        mm_dit = importlib.import_module("comfy.ldm.minimax.model")
+        dit_cls = getattr(mm_dit, "MiniMaxH3Model", None)
+        if dit_cls is not None and not getattr(dit_cls, "_mmh3_cn_patched", False):
+            orig_forward = dit_cls._forward
+
+            def _forward_with_control(self, x, timestep, context, transformer_options={}, minimax_payload=None, **kwargs):
+                control = kwargs.get("control")
+                if isinstance(control, dict) and (control.get("output") or control.get("input")):
+                    res_list = (control.get("output") or []) + (control.get("input") or [])
+                    transformer_options = transformer_options.copy()
+                    pr = transformer_options.get("patches_replace", {}).copy()
+                    dit_pr = pr.get("dit", {}).copy()
+                    n_blocks = len(self.blocks)
+                    stride = max(1, n_blocks // max(1, len(res_list)))
+                    for idx, res in enumerate(res_list):
+                        blk_idx = min(n_blocks - 1, idx * stride)
+                        if res is not None and ("double_block", blk_idx) not in dit_pr:
+                            def _inject(args, wrapper_extra, _r=res):
+                                out = wrapper_extra["original_block"](args)
+                                img = out["img"]
+                                delta = _r.reshape(-1, _r.shape[-1]) if _r.ndim > 2 else _r
+                                if delta.shape[-1] == img.shape[-1] and delta.shape[0] <= img.shape[0]:
+                                    img[-delta.shape[0]:].add_(delta.to(device=img.device, dtype=img.dtype))
+                                return out
+                            dit_pr[("double_block", blk_idx)] = _inject
+                    pr["dit"] = dit_pr
+                    transformer_options["patches_replace"] = pr
+                return orig_forward(self, x, timestep, context, transformer_options=transformer_options, minimax_payload=minimax_payload, **kwargs)
+
+            dit_cls._forward = _forward_with_control
+            dit_cls._mmh3_cn_patched = True
+    except Exception:
+        return
 
 
 def boot_comfy(model_root):
@@ -91,10 +186,12 @@ def boot_comfy(model_root):
     import logging
 
     logging.disable(logging.CRITICAL)
+    _patch_psutil_cgroup()
     import comfy.model_management as mm
     import comfy.utils
     import folder_paths
 
+    _patch_minimax_model()
     # ComfyUI sizes its pin budget from host RAM; pinned pages cannot be reclaimed, so cap it to the container.
     if mm.MAX_PINNED_MEMORY > 0:
         mm.MAX_PINNED_MEMORY = min(mm.MAX_PINNED_MEMORY, host_ram_info()[1] * 0.6)
@@ -137,7 +234,28 @@ def _rel_model_name(path, subdir):
 def _load_clip(path):
     from nodes import CLIPLoader
 
-    return CLIPLoader().load_clip(_rel_model_name(path, "clip"), type="minimax")[0]
+    clip = CLIPLoader().load_clip(_rel_model_name(path, "clip"), type="minimax")[0]
+
+    def _estimate_clip_memory(tokens, device=None):
+        seq = 0
+        vis_blocks = 0
+        items = tokens.get("qwen3vl_32b", ()) if isinstance(tokens, dict) else tokens
+        for batch in items or ():
+            for tok in batch:
+                entry = tok[0] if isinstance(tok, tuple) else tok
+                if isinstance(entry, dict) and hasattr(entry.get("data"), "shape"):
+                    shape = entry["data"].shape
+                    h, w = int(shape[-3]), int(shape[-2])
+                    vis_blocks += 1
+                    seq += max(64, (h // 32) * (w // 32))
+                else:
+                    seq += 1
+        # Reserve headroom for 2x NVFP4 dequant stream buffers + vision tower + 3x deepstack + 27648-wide MLP
+        return int(3.2 * GIB + seq * 262_144 + vis_blocks * 32 * 1024 ** 2)
+
+    if hasattr(clip, "cond_stage_model"):
+        clip.cond_stage_model.memory_estimation_function = _estimate_clip_memory
+    return clip
 
 
 def _load_vae(path, dtype):
@@ -212,6 +330,22 @@ def run_job(payload, registry, progress, abort_event):
     if dit_dev.type == "cuda":
         torch.cuda.set_device(dit_dev)
     boot_comfy(root)
+    import comfy.model_management as mm
+
+    mm.interrupt_current_processing(False)
+    try:
+        return _run_job_inner(
+            payload, registry, report, checkpoint, models, mode, width, height, frames, fps,
+            seed, steps, denoise, scheduler, ref_mode, cn_cfg, strength, plan, enc_dev, dit_dev,
+        )
+    except mm.InterruptProcessingException as exc:
+        raise JobAborted() from exc
+
+
+def _run_job_inner(
+    payload, registry, report, checkpoint, models, mode, width, height, frames, fps,
+    seed, steps, denoise, scheduler, ref_mode, cn_cfg, strength, plan, enc_dev, dit_dev,
+):
     keep = set()
 
     def load(slot, subdir, name, loader, frac, label, key=None):
@@ -246,16 +380,18 @@ def run_job(payload, registry, progress, abort_event):
     else:
         registry.evict("lora")
     control = None
-    if cn_cfg.get("enabled") and models.get("controlnet") and cn_cfg.get("path"):
+    if cn_cfg.get("enabled"):
+        if not models.get("controlnet") or not cn_cfg.get("path"):
+            raise BadReference()
         control = load("controlnet", "controlnet", models["controlnet"], _load_controlnet, 0.16, "ControlNet")
 
     report("stage1_encode", 0.19, f"Stage 1: encoding prompt & references on {enc_dev}")
     try:
         with device_scope(enc_dev):
             positive, latent = _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode)
-        if control is not None:
-            report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
-            positive = _apply_controlnet(positive, control, video_vae, cn_cfg, frames, height, width)
+            if control is not None:
+                report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
+                positive = _apply_controlnet(positive, control, video_vae, cn_cfg, frames, height, width)
     except ValueError as exc:
         raise BadReference() from exc
     checkpoint()
@@ -329,16 +465,20 @@ def _reference_pack(references, width, height, frames, ref_mode):
     for index, path in enumerate((references.get("videos") or [])[:3]):
         clip = _load_video_native(path, frames)
         videos[f"ref_video_{index}"] = clip.permute(0, 2, 3, 1).contiguous()
+        clip_seconds = max(0.25, float(clip.shape[0]) / 24.0)
         audio_path = paired[index] if index < len(paired) and paired[index] else None
         if audio_path:
-            wave = _load_audio_full(audio_path, required=True)
+            wave = _load_audio_full(audio_path, required=True, max_seconds=clip_seconds)
         else:
-            wave = _load_audio_full(path, required=False)
+            wave = _load_audio_full(path, required=False, max_seconds=clip_seconds)
         if wave is not None:
             video_audios[f"ref_video_audio_{index}"] = _audio_payload(wave)
     audios = {}
+    max_audio_sec = max(15.0, float(frames) / 24.0)
     for index, path in enumerate((references.get("audios") or [])[:3]):
-        audios[f"ref_audio_{index}"] = _audio_payload(_load_audio_full(path, required=True))
+        audios[f"ref_audio_{index}"] = _audio_payload(
+            _load_audio_full(path, required=True, max_seconds=max_audio_sec)
+        )
     return images, videos, video_audios, audios
 
 
@@ -348,6 +488,7 @@ def _audio_payload(wave):
 
 
 def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width):
+    import comfy.utils
     from nodes import ControlNetApplyAdvanced
 
     path = cn_cfg["path"]
@@ -355,7 +496,7 @@ def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width)
     if ext in {".mp4", ".webm", ".mov", ".mkv"}:
         image = _load_video(path, width, height, frames).permute(0, 2, 3, 1).contiguous()
     else:
-        image = _load_image(path, width, height, "match").permute(1, 2, 0).unsqueeze(0).contiguous()
+        image = _load_image(path, width, height, "exact").permute(1, 2, 0).unsqueeze(0).contiguous()
     positive, _negative = ControlNetApplyAdvanced().apply_controlnet(
         positive,
         positive,
@@ -366,6 +507,21 @@ def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width)
         float(cn_cfg.get("end_percent", 0.85)),
         vae=vae,
     )
+    for entry in positive:
+        cnet = entry[1].get("control") if len(entry) > 1 and isinstance(entry[1], dict) else None
+        if cnet is not None and not getattr(cnet, "_mmh3_packed_wrapped", False):
+            orig_get_control = cnet.get_control
+
+            def _get_control(x_noisy, t, cond, batched_number, transformer_options, _orig=orig_get_control):
+                if getattr(x_noisy, "ndim", 0) == 3 and isinstance(cond, dict) and "latent_shapes" in cond:
+                    x_noisy = comfy.utils.unpack_latents(x_noisy, cond["latent_shapes"])[0]
+                try:
+                    return _orig(x_noisy, t, cond, batched_number, transformer_options)
+                except Exception:
+                    return None
+
+            cnet.get_control = _get_control
+            cnet._mmh3_packed_wrapped = True
     return positive
 
 
@@ -480,14 +636,19 @@ def _load_image(path, width, height, ref_mode):
 
 def _resize_image(image, gen_w, gen_h, ref_mode):
     height, width = image.shape[:2]
-    if ref_mode == "max":
-        short = min(height, width)
-        scale = 1.0 if short <= 2048 else 2048.0 / float(short)
+    if ref_mode == "exact":
+        new_w, new_h = int(gen_w), int(gen_h)
     else:
-        scale = math.sqrt((gen_w * gen_h) / max(1, width * height))
-    new_w = max(32, int(round((width * scale) / 32.0) * 32))
-    new_h = max(32, int(round((height * scale) / 32.0) * 32))
+        if ref_mode == "max":
+            short = min(height, width)
+            scale = 1.0 if short <= 2048 else 2048.0 / float(short)
+        else:
+            scale = min(1.0, math.sqrt((gen_w * gen_h) / max(1, width * height)))
+        new_w = max(32, int(round((width * scale) / 32.0) * 32))
+        new_h = max(32, int(round((height * scale) / 32.0) * 32))
     tensor = image.permute(2, 0, 1).unsqueeze(0)
+    if new_h == height and new_w == width:
+        return tensor[0].contiguous()
     tensor = F.interpolate(tensor, size=(new_h, new_w), mode="bilinear", align_corners=False)
     return tensor[0]
 
@@ -508,6 +669,8 @@ def _load_video_native(path, target_frames):
     if probed is None:
         raise BadReference()
     src_w, src_h = probed
+    max_frames = max(5, int(target_frames))
+    check_host_gate(src_w, src_h, max_frames)
     raw = _ffmpeg_raw(
         [
             "ffmpeg",
@@ -521,6 +684,8 @@ def _load_video_native(path, target_frames):
             "-an",
             "-vf",
             "fps=24",
+            "-frames:v",
+            str(max_frames),
             "-f",
             "rawvideo",
             "-pix_fmt",
@@ -531,15 +696,14 @@ def _load_video_native(path, target_frames):
     frame_size = src_w * src_h * 3
     if frame_size <= 0 or len(raw) < frame_size * 5:
         raise BadReference()
-    count = len(raw) // frame_size
-    frames = torch.frombuffer(bytearray(raw[: count * frame_size]), dtype=torch.uint8).reshape(count, src_h, src_w, 3)
-    frames = frames.float() / 255.0
-    if count > target_frames:
-        frames = frames[:target_frames]
-    keep = _largest_aligned(int(frames.shape[0]))
+    count = min(max_frames, len(raw) // frame_size)
+    keep = _largest_aligned(count)
     if keep < 5:
         raise BadReference()
-    frames = frames[:keep]
+    frames = torch.frombuffer(bytearray(memoryview(raw)[: keep * frame_size]), dtype=torch.uint8).reshape(
+        keep, src_h, src_w, 3
+    )
+    frames = frames.float().div_(255.0)
     return frames.permute(0, 3, 1, 2).contiguous()
 
 
@@ -555,7 +719,7 @@ def _largest_aligned(count):
     return value
 
 
-def _load_audio_full(path, required):
+def _load_audio_full(path, required, max_seconds=15.0):
     try:
         real = _require_media(path)
     except BadReference:
@@ -571,6 +735,8 @@ def _load_audio_full(path, required):
             "-i",
             real,
             "-vn",
+            "-t",
+            f"{max(0.25, float(max_seconds)):.3f}",
             "-f",
             "f32le",
             "-ac",
@@ -649,8 +815,14 @@ def _mux(frames_rgb, waveform, width, height, fps, output_path):
         )
         video = video.permute(0, 2, 3, 1).round().to(torch.uint8).contiguous()
     audio = waveform.float().contiguous()
+    target_samples = max(1, int(round(video.shape[0] / 24.0 * 48000)))
     if audio.ndim != 2 or audio.shape[1] != 2:
-        audio = torch.zeros(max(1, int(video.shape[0] / 24.0 * 48000)), 2)
+        audio = torch.zeros(target_samples, 2)
+    elif audio.shape[0] > target_samples:
+        audio = audio[:target_samples].contiguous()
+    elif audio.shape[0] < target_samples:
+        pad = torch.zeros(target_samples - audio.shape[0], 2, dtype=audio.dtype)
+        audio = torch.cat([audio, pad], dim=0).contiguous()
     audio_read, audio_write = os.pipe()
     cmd = [
         "ffmpeg",

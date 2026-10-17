@@ -17,6 +17,7 @@ from pipeline_h3 import BadReference, JobAborted, MuxFailed, run_job
 WRITE_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
 JOBS = {}
+CURRENT_JOB = None
 CMD_Q = queue.Queue()
 MAX_FRAME = 64 * 1024 * 1024
 
@@ -76,15 +77,29 @@ def write_msg(conn, obj):
         conn.sendall(header + payload)
 
 
+def _interrupt_comfy():
+    if "comfy.model_management" not in sys.modules:
+        return
+    try:
+        import comfy.model_management as mm
+
+        mm.interrupt_current_processing(True)
+    except Exception:
+        return
+
+
 def mark_abort(job_id):
     with JOBS_LOCK:
         if job_id:
             event = JOBS.get(job_id)
             if event is not None:
                 event.set()
+            if job_id == CURRENT_JOB:
+                _interrupt_comfy()
             return
         for event in JOBS.values():
             event.set()
+        _interrupt_comfy()
 
 
 def emit(conn, job_id, stage, frac, detail):
@@ -168,6 +183,7 @@ def _is_oom(exc):
 
 def coordinator(registry):
     """Runs generate and flush commands strictly one at a time."""
+    global CURRENT_JOB
     while True:
         cmd = CMD_Q.get()
         if cmd["type"] == "flush":
@@ -185,6 +201,8 @@ def coordinator(registry):
         def _progress(stage, frac, detail, _conn=cmd.get("conn"), _job=job_id):
             emit(_conn, _job, stage, frac, detail)
 
+        with JOBS_LOCK:
+            CURRENT_JOB = job_id
         try:
             run_job(cmd["payload"], registry, _progress, cmd["event"])
             box.put({"type": "result", "job_id": job_id, "payload": {"ok": True}})
@@ -204,6 +222,9 @@ def coordinator(registry):
                 box.put(error_frame(job_id, "insufficient_vram"))
             else:
                 box.put(error_frame(job_id, "inference_failed"))
+        finally:
+            with JOBS_LOCK:
+                CURRENT_JOB = None
 
 
 def main():

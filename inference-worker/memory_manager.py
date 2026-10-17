@@ -83,10 +83,10 @@ def device_scope(device):
 
 
 def _nvidia_smi_free():
-    """Physical index -> (free_bytes, total_bytes) without creating CUDA contexts."""
+    """Physical index / UUID -> (free_bytes, total_bytes) without creating CUDA contexts."""
     try:
         proc = subprocess.run(
-            ["nvidia-smi", "--query-gpu=index,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            ["nvidia-smi", "--query-gpu=index,uuid,memory.total,memory.free", "--format=csv,noheader,nounits"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             check=False,
@@ -97,12 +97,25 @@ def _nvidia_smi_free():
     rows = {}
     for line in proc.stdout.decode("ascii", "ignore").splitlines():
         parts = [p.strip() for p in line.split(",")]
-        if len(parts) >= 3:
-            try:
+        try:
+            if len(parts) >= 4:
+                info = (int(float(parts[3])) * 1024 ** 2, int(float(parts[2])) * 1024 ** 2)
+                rows[int(parts[0])] = info
+                if parts[1]:
+                    rows[parts[1]] = info
+            elif len(parts) == 3:
                 rows[int(parts[0])] = (int(float(parts[2])) * 1024 ** 2, int(float(parts[1])) * 1024 ** 2)
-            except ValueError:
-                continue
+        except ValueError:
+            continue
     return rows
+
+
+def _device_uuid(index):
+    try:
+        uid = getattr(torch.cuda.get_device_properties(index), "uuid", None)
+        return f"GPU-{uid}" if uid else None
+    except Exception:
+        return None
 
 
 def _visible_gpu_memory():
@@ -115,10 +128,13 @@ def _visible_gpu_memory():
         try:
             mapping = [int(v) for v in visible.split(",") if v.strip()][:count]
         except ValueError:
-            phys = {}
+            mapping = []
     rows = []
     for index in range(count):
-        if phys and index < len(mapping) and mapping[index] in phys:
+        uid = _device_uuid(index) if phys else None
+        if uid and uid in phys:
+            free_b, total_b = phys[uid]
+        elif phys and index < len(mapping) and mapping[index] in phys:
             free_b, total_b = phys[mapping[index]]
         else:
             free_b, total_b = torch.cuda.mem_get_info(index)
@@ -196,7 +212,7 @@ class ModelRegistry:
             return
         current["module"] = None
         current["key"] = None
-        _unload_comfy_models()
+        _unload_comfy_models({self.plan[slot]})
         self.trim_all_memory()
 
     def _ensure_ram(self, nbytes, keep):
@@ -248,12 +264,22 @@ class ModelRegistry:
             return
 
 
-def _unload_comfy_models():
+def _unload_comfy_models(devices=None):
     if "comfy.model_management" not in sys.modules:
         return
     try:
         import comfy.model_management as mm
 
-        mm.unload_all_models()
+        active = {
+            getattr(m, "device", None)
+            for m in list(getattr(mm, "current_loaded_models", ()))
+        }
+        active.discard(None)
+        if devices is not None:
+            active &= set(devices)
+        for dev in active:
+            mm.free_memory(1e30, dev)
+        mm.cleanup_models_gc()
+        mm.cleanup_models()
     except Exception:
         return

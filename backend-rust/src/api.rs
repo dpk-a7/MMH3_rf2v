@@ -1120,17 +1120,13 @@ async fn flush_all(state: &AppState) -> Result<EnvelopeOut, String> {
             job.detail = "Flushed by user".into();
         }
     }
-    let ipc = state.ipc.clone();
-    let ids_bg = ids;
-    tokio::spawn(async move {
-        for id in &ids_bg {
-            let _ = ipc.control("abort", &id.to_string()).await;
-        }
-        let _ = ipc.control("flush", "").await;
-    });
+    let worker_ok = state.ipc.control("flush", "").await.is_ok();
     state.storage.flush_all_now().await;
     state.media.clear();
     state.jobs.clear();
+    if !worker_ok {
+        return Err("flush_failed".into());
+    }
     Ok(EnvelopeOut {
         ok: true,
         action: "flush_all".into(),
