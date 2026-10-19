@@ -49,6 +49,8 @@ services:
       - TORCH_HOME=/tmp/torch
       - HF_HOME=/tmp/hf
       - CUDA_DEVICE_ORDER=PCI_BUS_ID
+      - CC=gcc
+      - TRITON_CACHE_DIR=/tmp/triton
       - MMH3_MIN_FREE_VRAM_GB=${MMH3_MIN_FREE_VRAM_GB:-6}
     ports:
       - "8443:8443"

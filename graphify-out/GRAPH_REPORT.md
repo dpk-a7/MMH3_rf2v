@@ -1,7 +1,7 @@
 # Graph Report - /home/deepak/DeepakProj/MMH3  (2026-10-19)
 
 ## Corpus Check
-- 24 files · ~59,847 words
+- 24 files · ~60,459 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

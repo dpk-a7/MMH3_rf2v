@@ -31,10 +31,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     EPHEMERAL_DIR=/app/ephemeral \
     IPC_SOCK=/dev/shm/minimax_h3.sock \
     CUDA_DEVICE_ORDER=PCI_BUS_ID \
+    CC=gcc \
+    TRITON_CACHE_DIR=/tmp/triton \
     RUST_LOG=off \
     RUST_BACKTRACE=0
+# gcc: Triton JIT-compiles Qwen attention during Stage 1 encode. The CUDA runtime image ships no compiler.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip ffmpeg libgl1 libglib2.0-0 ca-certificates git \
+    python3 python3-pip ffmpeg libgl1 libglib2.0-0 ca-certificates git gcc \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /dev/null /var/log/dpkg.log \
     && ln -sf /dev/null /var/log/alternatives.log
@@ -62,4 +65,4 @@ RUN mkdir -p /app/model/diffussion /app/model/lora /app/model/controlnet /app/mo
     && chmod 0755 /app/minimax-h3-backend
 
 # One worker process places whole models on GPUs (see Specs.md §4.2) and is restarted if it ever dies.
-ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /app/ephemeral/uploads /app/ephemeral/outputs /tmp/cache /tmp/torch && chmod 0700 /app/ephemeral /app/ephemeral/uploads /app/ephemeral/outputs && (while true; do python3 /app/inference-worker/worker_daemon.py >/dev/null 2>&1; sleep 3; done) & exec /app/minimax-h3-backend >/dev/null 2>&1"]
+ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /app/ephemeral/uploads /app/ephemeral/outputs /tmp/cache /tmp/torch /tmp/triton && chmod 0700 /app/ephemeral /app/ephemeral/uploads /app/ephemeral/outputs && (while true; do python3 /app/inference-worker/worker_daemon.py >/dev/null 2>&1; sleep 3; done) & exec /app/minimax-h3-backend >/dev/null 2>&1"]

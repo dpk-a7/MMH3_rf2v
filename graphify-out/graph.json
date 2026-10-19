@@ -1970,9 +1970,9 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L184",
-      "id": "worker_daemon_rationale_184",
       "community": 6,
-      "norm_label": "runs generate and flush commands strictly one at a time."
+      "norm_label": "runs generate and flush commands strictly one at a time.",
+      "id": "worker_daemon_rationale_184"
     },
     {
       "label": "test_heterogeneous_vram.py",
@@ -2627,18 +2627,18 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L238",
-      "id": "pipeline_h3_rationale_238",
       "community": 10,
-      "norm_label": "activation budget comfyui must keep free before qwen3-vl encode.      cliploader"
+      "norm_label": "activation budget comfyui must keep free before qwen3-vl encode.      cliploader",
+      "id": "pipeline_h3_rationale_238"
     },
     {
       "label": "Pack reference latents in prompt order: images, then each soundtrack before its",
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L615",
-      "id": "pipeline_h3_rationale_615",
       "community": 3,
-      "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its"
+      "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
+      "id": "pipeline_h3_rationale_615"
     },
     {
       "label": "memory_manager.py",
@@ -8755,9 +8755,9 @@
       "weight": 0.8,
       "_src": "worker_daemon_rationale_184",
       "_tgt": "memory_manager_modelregistry",
+      "confidence_score": 0.5,
       "source": "worker_daemon_rationale_184",
-      "target": "memory_manager_modelregistry",
-      "confidence_score": 0.5
+      "target": "memory_manager_modelregistry"
     },
     {
       "relation": "uses",
@@ -8767,9 +8767,9 @@
       "weight": 0.8,
       "_src": "worker_daemon_rationale_184",
       "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
       "source": "worker_daemon_rationale_184",
-      "target": "memory_manager_resourcelimitexceeded",
-      "confidence_score": 0.5
+      "target": "memory_manager_resourcelimitexceeded"
     },
     {
       "relation": "uses",
@@ -8779,9 +8779,9 @@
       "weight": 0.8,
       "_src": "worker_daemon_rationale_184",
       "_tgt": "pipeline_h3_badreference",
+      "confidence_score": 0.5,
       "source": "worker_daemon_rationale_184",
-      "target": "pipeline_h3_badreference",
-      "confidence_score": 0.5
+      "target": "pipeline_h3_badreference"
     },
     {
       "relation": "uses",
@@ -8791,9 +8791,9 @@
       "weight": 0.8,
       "_src": "worker_daemon_rationale_184",
       "_tgt": "pipeline_h3_jobaborted",
+      "confidence_score": 0.5,
       "source": "worker_daemon_rationale_184",
-      "target": "pipeline_h3_jobaborted",
-      "confidence_score": 0.5
+      "target": "pipeline_h3_jobaborted"
     },
     {
       "relation": "uses",
@@ -8803,9 +8803,9 @@
       "weight": 0.8,
       "_src": "worker_daemon_rationale_184",
       "_tgt": "pipeline_h3_muxfailed",
+      "confidence_score": 0.5,
       "source": "worker_daemon_rationale_184",
-      "target": "pipeline_h3_muxfailed",
-      "confidence_score": 0.5
+      "target": "pipeline_h3_muxfailed"
     },
     {
       "relation": "contains",
@@ -9785,8 +9785,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L15",
       "weight": 0.8,
-      "_src": "worker_daemon_rationale_200",
-      "_tgt": "pipeline_h3_jobaborted",
+      "_src": "pipeline_h3_jobaborted",
+      "_tgt": "worker_daemon_rationale_200",
       "confidence_score": 0.5,
       "source": "pipeline_h3_jobaborted",
       "target": "worker_daemon_rationale_200"
@@ -9977,8 +9977,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L15",
       "weight": 0.8,
-      "_src": "worker_daemon_rationale_200",
-      "_tgt": "pipeline_h3_badreference",
+      "_src": "pipeline_h3_badreference",
+      "_tgt": "worker_daemon_rationale_200",
       "confidence_score": 0.5,
       "source": "pipeline_h3_badreference",
       "target": "worker_daemon_rationale_200"
@@ -10085,8 +10085,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L15",
       "weight": 0.8,
-      "_src": "worker_daemon_rationale_200",
-      "_tgt": "pipeline_h3_muxfailed",
+      "_src": "pipeline_h3_muxfailed",
+      "_tgt": "worker_daemon_rationale_200",
       "confidence_score": 0.5,
       "source": "pipeline_h3_muxfailed",
       "target": "worker_daemon_rationale_200"
@@ -11227,9 +11227,9 @@
       "weight": 0.8,
       "_src": "pipeline_h3_rationale_238",
       "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
       "source": "pipeline_h3_rationale_238",
-      "target": "memory_manager_resourcelimitexceeded",
-      "confidence_score": 0.5
+      "target": "memory_manager_resourcelimitexceeded"
     },
     {
       "relation": "uses",
@@ -11239,9 +11239,9 @@
       "weight": 0.8,
       "_src": "pipeline_h3_rationale_615",
       "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
       "source": "pipeline_h3_rationale_615",
-      "target": "memory_manager_resourcelimitexceeded",
-      "confidence_score": 0.5
+      "target": "memory_manager_resourcelimitexceeded"
     },
     {
       "relation": "contains",
@@ -11561,8 +11561,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L14",
       "weight": 0.8,
-      "_src": "worker_daemon_rationale_200",
-      "_tgt": "memory_manager_resourcelimitexceeded",
+      "_src": "memory_manager_resourcelimitexceeded",
+      "_tgt": "worker_daemon_rationale_200",
       "confidence_score": 0.5,
       "source": "memory_manager_resourcelimitexceeded",
       "target": "worker_daemon_rationale_200"
@@ -11573,8 +11573,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L11",
       "weight": 0.8,
-      "_src": "pipeline_h3_rationale_600",
-      "_tgt": "memory_manager_resourcelimitexceeded",
+      "_src": "memory_manager_resourcelimitexceeded",
+      "_tgt": "pipeline_h3_rationale_600",
       "confidence_score": 0.5,
       "source": "memory_manager_resourcelimitexceeded",
       "target": "pipeline_h3_rationale_600"
@@ -12485,8 +12485,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L14",
       "weight": 0.8,
-      "_src": "worker_daemon_rationale_200",
-      "_tgt": "memory_manager_modelregistry",
+      "_src": "memory_manager_modelregistry",
+      "_tgt": "worker_daemon_rationale_200",
       "confidence_score": 0.5,
       "source": "memory_manager_modelregistry",
       "target": "worker_daemon_rationale_200"
