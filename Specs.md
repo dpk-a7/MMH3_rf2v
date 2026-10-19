@@ -1222,7 +1222,7 @@ RUN cargo build --release --locked
 FROM nvidia/cuda:13.0.0-runtime-ubuntu24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip ffmpeg libgl1 libglib2.0-0 ca-certificates \
+    python3 python3-pip python3-dev ffmpeg libgl1 libglib2.0-0 ca-certificates gcc \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /dev/null /var/log/dpkg.log \
     && ln -sf /dev/null /var/log/alternatives.log
@@ -1243,6 +1243,41 @@ ENTRYPOINT ["/bin/sh", "-c", "(while true; do python3 /app/inference-worker/work
 ```
 
 ---
+
+### 8.3. Triton runtime compiler prerequisites
+
+The repository `Dockerfile` is the authoritative build recipe; the preceding
+example is an architectural sketch. Triton compiles a host-side CUDA helper
+during Stage 1. Its [NVIDIA driver source](https://github.com/triton-lang/triton/blob/main/third_party/nvidia/backend/driver.c)
+includes `Python.h` and C library headers, so `gcc` alone is insufficient in the
+CUDA runtime image. Install `python3-dev` for the image's system Python. Ubuntu
+24.04's [package dependencies](https://packages.ubuntu.com/noble/python3-dev)
+also bring in the required C development headers through `libpython3.12-dev`
+and `zlib1g-dev`, including with `--no-install-recommends`.
+
+The image build now compiles a fixed `Python.h` translation unit into a shared
+object before installing the inference packages. This checks the host compiler
+and headers without GPUs or model weights; it does not validate CUDA driver
+linking, Triton kernels, or full generation. Keep `CC=gcc` and the writable
+`TRITON_CACHE_DIR=/tmp/triton` runtime configuration.
+
+On 2026-10-19, an isolated Ubuntu 24.04 container with the original apt package
+list failed compilation twice with `fatal error: Python.h: No such file or
+directory`. Installing `python3-dev` made the same compilation and shared-object
+load pass. Hiding `Python.h` reproduced the failure; restoring it passed again.
+The updated dependency and compiler-check layers also built successfully on
+`nvidia/cuda:13.0.0-runtime-ubuntu24.04`.
+This verifies the header dependency, not the exact cause on a remote deployment:
+the reported `CalledProcessError` omits compiler stderr, and runtime logging is
+deliberately disabled. CUDA driver/linker errors remain a separate possibility.
+
+On the GPU deployment, download any outputs to retain before recreating the
+container: uploads, outputs, and sessions are ephemeral. Rebuild with
+`docker compose up -d --build minimax-h3-app`, then retry generation. A plain
+container restart cannot install the new image dependency. Confirm the job
+passes Stage 1 and produces a playable output; local CPU checks cannot prove
+three-GPU inference. This repair changes no model parameters, API fields,
+capability limits, pricing rules, or database schemas.
 
 ## 9. Step-by-Step Execution Prompt for Your Coding Agent
 

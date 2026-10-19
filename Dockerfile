@@ -35,12 +35,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRITON_CACHE_DIR=/tmp/triton \
     RUST_LOG=off \
     RUST_BACKTRACE=0
-# gcc: Triton JIT-compiles Qwen attention during Stage 1 encode. The CUDA runtime image ships no compiler.
+# Triton's Stage 1 CUDA helper needs gcc plus Python and C development headers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip ffmpeg libgl1 libglib2.0-0 ca-certificates git gcc \
+    python3 python3-pip python3-dev ffmpeg libgl1 libglib2.0-0 ca-certificates git gcc \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /dev/null /var/log/dpkg.log \
     && ln -sf /dev/null /var/log/alternatives.log
+
+# Fail the image build on missing host headers; this check needs no GPU or model weights.
+RUN printf '#include <Python.h>\n' | gcc -x c -shared -fPIC \
+    -I"$(python3 -c 'import sysconfig; print(sysconfig.get_path("include"))')" \
+    -o /tmp/triton-header-check.so - \
+    && rm /tmp/triton-header-check.so
 
 RUN pip3 install --no-cache-dir --break-system-packages \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130 \
