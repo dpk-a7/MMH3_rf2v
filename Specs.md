@@ -1175,7 +1175,7 @@ services:
     # 3. READ-ONLY ROOT FILESYSTEM + RAM-BACKED EPHEMERAL STORAGE
     read_only: true
     tmpfs:
-      - /tmp:size=4G,mode=1777
+      - /tmp:size=4G,mode=1777,exec,nosuid,nodev
       - /dev/shm:size=16G,mode=1777
       - /app/ephemeral:size=32G,mode=0700
     volumes:
@@ -1278,6 +1278,32 @@ container restart cannot install the new image dependency. Confirm the job
 passes Stage 1 and produces a playable output; local CPU checks cannot prove
 three-GPU inference. This repair changes no model parameters, API fields,
 capability limits, pricing rules, or database schemas.
+
+### 8.4. Runtime JIT cache must allow executable mappings
+
+On the deployed container, `/tmp` was mounted with `noexec`. Triton 3.8.0 could
+compile `cuda_utils.cpython-312-x86_64-linux-gnu.so`, but importing it failed with
+`failed to map segment from shared object`. The cache had ample free space.
+The Compose `/tmp` mount now explicitly sets `exec,nosuid,nodev`, allowing JIT
+libraries to load while retaining the other mount restrictions. File mode
+`1777` alone does not override `noexec`; Docker documents these as separate
+[tmpfs options](https://docs.docker.com/engine/storage/tmpfs/#options-for---tmpfs).
+The upload/output and shared-memory mounts are unchanged.
+
+Run the regression test inside the deployed container, where runtime mount
+flags apply. It compiles fixed source against `Python.h`, loads it from
+`TRITON_CACHE_DIR`, calls its Python-version function, and cleans up its files:
+
+```bash
+docker compose exec -T minimax-h3-app python3 - < inference-worker/test_runtime_jit.py
+docker compose exec -T minimax-h3-app python3 -c 'from triton.backends.nvidia.driver import CudaUtils; CudaUtils(); print("TRITON_DRIVER_READY")'
+```
+
+An image-build check cannot detect a `noexec` mount applied when the container
+starts. Applying this Compose-only fix to an existing image requires container
+recreation, not an image rebuild or a plain restart. Download outputs to retain
+first, then run `docker compose up -d --no-build --force-recreate minimax-h3-app`.
+Recreation clears ephemeral uploads, outputs, and sessions.
 
 ## 9. Step-by-Step Execution Prompt for Your Coding Agent
 
