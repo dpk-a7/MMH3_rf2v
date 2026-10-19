@@ -12,7 +12,7 @@ import msgpack
 import torch
 
 from memory_manager import ModelRegistry, ResourceLimitExceeded
-from pipeline_h3 import BadReference, JobAborted, MuxFailed, run_job
+from pipeline_h3 import BadReference, JobAborted, MuxFailed, _cuda_oom, _failure_text, run_job
 
 WRITE_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
@@ -180,10 +180,6 @@ def error_frame(job_id, code):
     return {"type": "error", "job_id": job_id, "payload": {"error": code}}
 
 
-def _is_oom(exc):
-    return isinstance(exc, torch.cuda.OutOfMemoryError) or "out of memory" in str(exc).lower()
-
-
 def coordinator(registry):
     """Runs generate and flush commands strictly one at a time."""
     global CURRENT_JOB
@@ -220,7 +216,8 @@ def coordinator(registry):
         except ResourceLimitExceeded as exc:
             box.put(error_frame(job_id, str(exc) or "insufficient_vram"))
         except Exception as exc:
-            if _is_oom(exc):
+            _progress("failed", 1.0, _failure_text(exc))
+            if _cuda_oom(exc):
                 registry.trim_all_memory()
                 box.put(error_frame(job_id, "insufficient_vram"))
             else:

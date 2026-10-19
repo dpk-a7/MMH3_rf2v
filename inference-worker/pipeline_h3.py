@@ -234,27 +234,36 @@ def _rel_model_name(path, subdir):
     return os.path.basename(path)
 
 
+def clip_activation_bytes(tokens, floor_bytes=9 * GIB):
+    """Activation budget ComfyUI must keep free before Qwen3-VL encode.
+
+    CLIPLoader otherwise fully pins ~16GB weights on a 20GB card, which leaves
+    too little room for a reference-image vision pass.
+    """
+    seq = 0
+    vis_blocks = 0
+    items = tokens.get("qwen3vl_32b", ()) if isinstance(tokens, dict) else tokens
+    for batch in items or ():
+        for tok in batch:
+            entry = tok[0] if isinstance(tok, tuple) else tok
+            if isinstance(entry, dict) and hasattr(entry.get("data"), "shape"):
+                shape = entry["data"].shape
+                h, w = int(shape[-3]), int(shape[-2])
+                vis_blocks += 1
+                seq += max(64, (h // 32) * (w // 32))
+            else:
+                seq += 1
+    need = int(3.2 * GIB + seq * 262_144 + vis_blocks * 32 * 1024 ** 2)
+    return max(need, int(floor_bytes))
+
+
 def _load_clip(path):
     from nodes import CLIPLoader
 
     clip = CLIPLoader().load_clip(_rel_model_name(path, "clip"), type="minimax")[0]
 
     def _estimate_clip_memory(tokens, device=None):
-        seq = 0
-        vis_blocks = 0
-        items = tokens.get("qwen3vl_32b", ()) if isinstance(tokens, dict) else tokens
-        for batch in items or ():
-            for tok in batch:
-                entry = tok[0] if isinstance(tok, tuple) else tok
-                if isinstance(entry, dict) and hasattr(entry.get("data"), "shape"):
-                    shape = entry["data"].shape
-                    h, w = int(shape[-3]), int(shape[-2])
-                    vis_blocks += 1
-                    seq += max(64, (h // 32) * (w // 32))
-                else:
-                    seq += 1
-        # Reserve headroom for 2x NVFP4 dequant stream buffers + vision tower + 3x deepstack + 27648-wide MLP
-        return int(3.2 * GIB + seq * 262_144 + vis_blocks * 32 * 1024 ** 2)
+        return clip_activation_bytes(tokens, getattr(clip, "_mmh3_activation_floor", 9 * GIB))
 
     if hasattr(clip, "cond_stage_model"):
         clip.cond_stage_model.memory_estimation_function = _estimate_clip_memory
@@ -349,8 +358,26 @@ def _tighten_video_vae(vae, usable_mb):
                 setattr(obj, name, min(cur, chunk))
 
 
+def _failure_text(exc):
+    text = f"{type(exc).__name__}: {exc}".replace("\n", " ")
+    return " ".join(text.split())[:180]
+
+
 def _cuda_oom(exc):
-    return isinstance(exc, torch.cuda.OutOfMemoryError) or "out of memory" in str(exc).lower()
+    seen = set()
+    cur = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        text = str(cur).lower()
+        if (
+            type(cur).__name__ == "OutOfMemoryError"
+            or "out of memory" in text
+            or "cublas_status_alloc_failed" in text
+            or "cudamalloc" in text
+        ):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
 
 
 def _count_refs(payload):
@@ -437,13 +464,63 @@ def _run_job_inner(
         return obj
 
     clip = load("clip", "clip", models["clip"], _load_clip, 0.04, "text encoder")
-    _apply_stage_shards(clip, registry.last_schedule, report, 0.05, "qwen3vl")
     video_vae = load(
         "video_vae", "vae", models["video_vae"], lambda p: _load_vae(p, torch.float16), 0.07, "video VAE (FP16)"
     )
     audio_vae = load(
         "audio_vae", "vae", models["audio_vae"], lambda p: _load_vae(p, torch.float32), 0.08, "audio VAE (FP32)"
     )
+    control = None
+    if cn_cfg.get("enabled"):
+        if not models.get("controlnet") or not cn_cfg.get("path"):
+            raise BadReference()
+        control = load("controlnet", "controlnet", models["controlnet"], _load_controlnet, 0.16, "ControlNet")
+
+    # CLIPLoader pins the full ~16GB encoder. Drop it so encode reloads with the 9GB activation floor.
+    report("stage1_encode", 0.18, f"Releasing full Qwen pin on {enc_dev} before vision encode")
+    _unload_device(enc_dev)
+    registry.trim_all_memory()
+    report("stage1_encode", 0.19, f"Stage 1: encoding prompt & references on {enc_dev}")
+
+    def _encode_stage1():
+        with device_scope(enc_dev):
+            cond, lat = _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode)
+            if control is not None:
+                report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
+                cond = _apply_controlnet(cond, control, video_vae, cn_cfg, frames, height, width)
+        return cond, lat
+
+    try:
+        positive, latent = _encode_stage1()
+    except ValueError as exc:
+        raise BadReference() from exc
+    except Exception as exc:
+        if not _cuda_oom(exc):
+            report("stage1_encode", 0.19, _failure_text(exc))
+            raise
+        report(
+            "stage1_encode",
+            0.19,
+            "Vision encode ran out of VRAM; streaming Qwen weights from RAM and retrying",
+        )
+        clip._mmh3_activation_floor = 12 * GIB
+        _unload_device(enc_dev)
+        registry.trim_all_memory()
+        try:
+            positive, latent = _encode_stage1()
+        except ValueError as exc:
+            raise BadReference() from exc
+    checkpoint()
+
+    req2 = estimate_stage_memory_mb("stage2", width, height, frames, num_refs)
+    schedule2 = registry.probe_and_plan("stage2", required_vram_mb=req2)
+    dit_dev = schedule2.lead_device
+    plan = registry.plan
+    if enc_dev == dit_dev:
+        report("stage1_offload", 0.24, f"Offloading Stage 1 encoders from {enc_dev}")
+        _unload_device(enc_dev)
+    else:
+        report("stage1_offload", 0.24, f"Encoders stay resident on {enc_dev}; DiT has {dit_dev} to itself")
     if not registry.cached("diffusion", models["diffusion"]):
         registry.evict("lora")
     runner = load("diffusion", "diffussion", models["diffusion"], _load_unet, 0.10, "DiT backbone")
@@ -460,32 +537,6 @@ def _run_job_inner(
         )
     else:
         registry.evict("lora")
-    control = None
-    if cn_cfg.get("enabled"):
-        if not models.get("controlnet") or not cn_cfg.get("path"):
-            raise BadReference()
-        control = load("controlnet", "controlnet", models["controlnet"], _load_controlnet, 0.16, "ControlNet")
-
-    report("stage1_encode", 0.19, f"Stage 1: encoding prompt & references on {enc_dev}")
-    try:
-        with device_scope(enc_dev):
-            positive, latent = _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode)
-            if control is not None:
-                report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
-                positive = _apply_controlnet(positive, control, video_vae, cn_cfg, frames, height, width)
-    except ValueError as exc:
-        raise BadReference() from exc
-    checkpoint()
-    if enc_dev == dit_dev:
-        report("stage1_offload", 0.24, f"Offloading Stage 1 encoders from {enc_dev}")
-        _unload_device(enc_dev)
-    else:
-        report("stage1_offload", 0.24, f"Encoders stay resident on {enc_dev}; DiT has {dit_dev} to itself")
-
-    req2 = estimate_stage_memory_mb("stage2", width, height, frames, num_refs)
-    schedule2 = registry.probe_and_plan("stage2", required_vram_mb=req2)
-    dit_dev = schedule2.lead_device
-    plan = registry.plan
     report("stage2_load", 0.27, f"Stage 2: checking activation memory on {dit_dev}")
     _apply_stage_shards(runner, schedule2, report, 0.28, "dit")
     check_vram_gate(runner, positive, latent, dit_dev)
