@@ -698,6 +698,35 @@ def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width)
     return positive
 
 
+def _is_fasth3(model):
+    """FastH3 checkpoints are VSA-trained and ship its coarse-attention gates."""
+    blocks = getattr(model.get_model_object("diffusion_model"), "blocks", None)
+    return bool(blocks) and getattr(blocks[0].attn, "to_gate_compress", None) is not None
+
+
+def _has_control(positive):
+    return any(len(c) > 1 and isinstance(c[1], dict) and c[1].get("control") is not None for c in positive or ())
+
+
+def _patch_attention(model, positive):
+    """Same model patches as ComfyUI's H3 templates; returns (model, sampler name)."""
+    from comfy_extras.nodes_minimax_h3 import MiniMaxH3SigmaShift
+    from comfy_extras.nodes_model_advanced import ModelAttentionBackend
+
+    model = _at(MiniMaxH3SigmaShift.execute(model, 12.0, 3.0), 0)
+    # Comfy Kitchen INT8 attention; the node itself falls back to PyTorch attention where the kernel is missing.
+    model = _at(ModelAttentionBackend.execute(model, "comfy kitchen attention"), 0)
+    if not _is_fasth3(model):
+        return model, "res_multistep"
+    if not _has_control(positive):
+        from comfy_extras.nodes_sparse_attention import BlockSparseAttention
+
+        # FastH3 is trained against VSA at keep 10% and must never run plain block-sparse attention.
+        # Skipped under ControlNet: VSA claims every block patch the control injection needs (dense is safe).
+        model = _at(BlockSparseAttention.execute(model, {"selection": "vsa", "keep_percent": 10.0}, 0.0, 1.0), 0)
+    return model, "euler"
+
+
 def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry=None):
     from comfy_extras.nodes_custom_sampler import (
         BasicGuider,
@@ -706,13 +735,12 @@ def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, che
         RandomNoise,
         SamplerCustomAdvanced,
     )
-    from comfy_extras.nodes_minimax_h3 import MiniMaxH3SigmaShift
 
     def _once():
         checkpoint()
-        shifted_model = _at(MiniMaxH3SigmaShift.execute(model, 12.0, 3.0), 0)
+        shifted_model, sampler_name = _patch_attention(model, positive)
         guider = _at(BasicGuider.execute(shifted_model, positive), 0)
-        sampler = _at(KSamplerSelect.execute("res_multistep"), 0)
+        sampler = _at(KSamplerSelect.execute(sampler_name), 0)
         sigmas = _at(BasicScheduler.execute(shifted_model, scheduler, steps, denoise), 0)
         noise = _at(RandomNoise.execute(int(seed) & 0xFFFFFFFFFFFFFFFF), 0)
         _hook_progress(guider, steps, report, checkpoint)

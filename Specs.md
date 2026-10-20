@@ -305,7 +305,7 @@ Clicking **"↺ Reset to Defaults"** restores the exact baseline state defined i
 
 
 
-* **Sampler**: `res_multistep` (`KSamplerSelect`).
+* **Sampler**: `res_multistep` (`KSamplerSelect`); `euler` for FastH3 checkpoints, matching ComfyUI's FastH3 OmniRef template.
 
 
 * **Scheduler**: `BasicScheduler` with `scheduler` selectable between `"simple"` (default), `"beta"`, or `"normal"` (recommended for heavy multi-reference prompts), `denoise = 1.0`.
@@ -354,9 +354,9 @@ Pre-allocate a pinned host memory pool (`torch.cuda.MemPool` / `pin_memory=True`
 * Stream `minimax_h3_ref2va_pruned_int8_convrot` (+ fused/patched Turbo LoRA + ControlNet if active) from Pinned Host RAM to GPU(s).
 
 
-* Attention uses ComfyUI's native optimized (exact) attention; no approximate block-sparse override is installed.
+* Attention follows ComfyUI's H3 templates: `ModelAttentionBackend` selects Comfy Kitchen INT8 attention (PyTorch attention where the kernel is unavailable). FastH3 checkpoints (detected by their `to_gate_compress` VSA layers) also get `BlockSparseAttention` method `vsa`, `keep_percent` 10, start 0 / end 1; it is skipped under ControlNet, which needs the same block patches. Base checkpoints never get block-sparse attention.
 * Before sampling, reject with `insufficient_vram` if `model.memory_required(latent_shape)` (activation memory, which cannot be streamed) exceeds the DiT GPU's reachable VRAM.
-* Run `res_multistep` sampling steps.
+* Run `res_multistep` sampling steps (`euler`, 8 steps for FastH3; the UI sets 8 when a `fasth3` model is picked).
 
 
 * **Offload**: Move DiT & ControlNet back to Pinned Host RAM; keep only the denoised `LATENT` (~50–200 MB) in VRAM; run `torch.cuda.empty_cache()`.

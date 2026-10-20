@@ -127,7 +127,15 @@ export function GenerationControls({
         <Field label={`Diffusion Model (model/diffussion/ · ${availableModels.diffussion.length} found)`}>
           <select
             value={state.diffusionModel}
-            onChange={(event) => setState((prev) => ({ ...prev, diffusionModel: event.target.value }))}
+            onChange={(event) => {
+              const name = event.target.value;
+              // FastH3 checkpoints are distilled to 8 steps.
+              setState((prev) => ({
+                ...prev,
+                diffusionModel: name,
+                steps: /fasth3/i.test(name) ? 8 : prev.mode === "turbo" ? 4 : 20,
+              }));
+            }}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm"
           >
             {renderModelOptions(availableModels.diffussion, state.diffusionModel, "diff")}

@@ -53,9 +53,10 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     && pip3 install --no-cache-dir --break-system-packages \
     safetensors einops transformers accelerate msgpack pyyaml scipy pillow numpy
 
-# Headless ComfyUI core pinned at v0.30.2, which contains MiniMaxH3ReferenceToVideo (PR #15224).
+# Headless ComfyUI core pinned at v0.42.2: MiniMaxH3ReferenceToVideo, Comfy Kitchen INT8 attention
+# (ModelAttentionBackend, v0.32+) and FastH3 VSA sparse attention (BlockSparseAttention, v0.35+).
 # The HTTP server is never started; worker_daemon imports the node classes in-process.
-RUN git clone --depth 1 --branch v0.30.2 --quiet https://github.com/Comfy-Org/ComfyUI.git /opt/comfyui \
+RUN git clone --depth 1 --branch v0.42.2 --quiet https://github.com/Comfy-Org/ComfyUI.git /opt/comfyui \
     && rm -rf /opt/comfyui/.git \
     && grep -viE '^(torch|torchvision|torchaudio|comfyui-frontend-package|comfyui-workflow-templates|comfyui-embedded-docs)([=<>]|$)' \
         /opt/comfyui/requirements.txt > /tmp/comfy-requirements.txt \
