@@ -37,7 +37,7 @@ export function ReferenceRack({
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-5">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Reference Rack</h2>
-        <p className="text-xs text-zinc-500 mt-1">9 images, 3 videos with optional paired audio, 3 standalone audios.</p>
+        <p className="text-xs text-zinc-500 mt-1">9 images, 3 videos (each uses its own soundtrack unless you pair other audio), 3 standalone audios.</p>
       </div>
       <SlotGrid
         title="Images"
@@ -149,7 +149,9 @@ function SlotGrid({
             {paired && onPairedPick && onPairedClear && (
               <div className="border-t border-zinc-800 pt-2 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-amber-400">Paired audio</span>
+                  <span className="text-[10px] text-amber-400">
+                    {paired[index]?.mediaId ? "Paired audio" : "Audio: video's own soundtrack"}
+                  </span>
                   {paired[index]?.mediaId && (
                     <button
                       type="button"

@@ -925,26 +925,32 @@ def _load_audio_full(path, required, max_seconds=15.0):
         if required:
             raise
         return None
-    raw = _ffmpeg_raw(
-        [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            real,
-            "-vn",
-            "-t",
-            f"{max(0.25, float(max_seconds)):.3f}",
-            "-f",
-            "f32le",
-            "-ac",
-            "2",
-            "-ar",
-            "48000",
-            "pipe:1",
-        ]
-    )
+    try:
+        raw = _ffmpeg_raw(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                real,
+                "-vn",
+                "-t",
+                f"{max(0.25, float(max_seconds)):.3f}",
+                "-f",
+                "f32le",
+                "-ac",
+                "2",
+                "-ar",
+                "48000",
+                "pipe:1",
+            ]
+        )
+    except BadReference:
+        # FFmpeg exits non-zero when a reference video has no audio stream.
+        if required:
+            raise
+        return None
     if len(raw) < 8:
         if required:
             raise BadReference()
