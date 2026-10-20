@@ -373,11 +373,11 @@ Pre-allocate a pinned host memory pool (`torch.cuda.MemPool` / `pin_memory=True`
 
 ### 4.2. Tier 2: Multi-GPU ($1 \dots N$) Placement Driven by Live VRAM
 
-A **single** worker process owns every visible GPU. Weights stay in their shipped compressed formats (int8 DiT, nvfp4 text encoder); they are never dequantized for placement. Every checkpoint is loaded exactly once into host RAM, one at a time. Device assignment is **not** anchored to `cuda:0` and is never a uniform $1/N$ split.
+A **single** worker process owns every visible GPU. Checkpoints are loaded one at a time through ComfyUI using their supplied precision (including the BF16 DiT and int8 text encoder). Device assignment is **not** anchored to `cuda:0`.
 
 * **Live planner** (`memory_manager.probe_live_gpus` / `build_stage_schedule`, run before every job and again before Stages 1, 2, and 3): combines `torch.cuda.mem_get_info` with `pynvml`/`nvidia-smi`. Busy cards (usable VRAM below `MIN_USABLE_VRAM_MB`) receive **0 bytes**.
 * `lead_device = argmax(usable_vram)` is the coordinator for latent init, unsharded embeddings, and residual gather.
-* Healthy GPUs receive transformer blocks of Qwen3-VL and the DiT in proportion to $w_i$ (§4.3). When $\sum$ usable VRAM $< M_{\text{stage}}$, the full stack stays in pinned host RAM and $K$ blocks stream onto `lead_device`.
+* The planner assigns models to healthy GPUs. ComfyUI `ModelPatcher` instances retain ComfyUI's native weight loading, low-VRAM offload, and pinning on their assigned `load_device`; the application must not install its own block streamer on the same weights.
 * **Stage 3**: re-probe, then put `video_vae` (FP16) on the emptiest healthy GPU and `audio_vae` (FP32) on the second; one healthy GPU runs them sequentially with a pinned offload. Tight video decode reduces temporal chunk size.
 * Each model is loaded while its target GPU is the current CUDA device, so ComfyUI binds `load_device` to it natively. Video decoding always goes through the standard `VAEDecode` node (never `VAEDecodeTiled`).
 * `CUDA_DEVICE_ORDER=PCI_BUS_ID` keeps PyTorch device indices identical to `nvidia-smi`.
@@ -390,13 +390,13 @@ The scheduler (`inference-worker/memory_manager.py`, `parallel_shard.py`) elimin
    * `usable_vram[i] = max(0, live_free[i] - VRAM_SAFETY_RESERVE_MB)` with defaults `VRAM_SAFETY_RESERVE_MB=1536`, `MIN_USABLE_VRAM_MB=3072`, `TIGHT_VRAM_THRESHOLD_MB=8192`.
    * `ACTIVE_FULL` / `ACTIVE_TIGHT` / `BYPASSED_BUSY`. Busy cards stay out of the weight map even if they are `cuda:0`.
 2. **Lead election**. `lead_device = argmax(usable_vram)` among healthy GPUs. If GPU 0 is occupied and GPU 1/2 are free, GPU 0 gets 0 weight and 0 blocks.
-3. **Capacity-weighted sharding**. For healthy set $A$:
+3. **Capacity-weighted raw-module sharding**. The standalone sharding utilities use the following weights for healthy set $A$:
    $$w_i = \frac{\text{usable}[i]}{\sum_{j \in A} \text{usable}[j]}$$
-   Transformer blocks, attention-head slices, and `ColumnParallelLinear`/`RowParallelLinear` `split_sizes` follow $w_i$, aligned to `head_dim`. Uneven `all_to_all_single` uses those split sizes when a process group is initialized; the default single-process path hops activations between locally placed blocks.
-4. **Pinned-RAM micro-block streaming**. If $\sum_{i \in A} \text{usable}[i] < M_{\text{stage}}$ (weights + KV/reference activation estimate), keep the stack pinned on the host and stream $K$ blocks onto `lead_device` with `compute_stream` / `transfer_stream` double buffering. A mid-step CUDA OOM trims memory, re-probes, and resumes the step in this mode instead of crashing the job.
+   Raw transformer blocks and `ColumnParallelLinear`/`RowParallelLinear` `split_sizes` follow $w_i$. These utilities are not applied to the ComfyUI diffusion `ModelPatcher`, including its LoRA/SigmaShift clones and subclasses.
+4. **Weight offload ownership**. ComfyUI manages the diffusion model's CPU/GPU storage, patches, and low-VRAM loading. A native CUDA OOM propagates to the worker's `insufficient_vram` response; it must not create another full pinned cache. For standalone raw modules only, the existing pinned-RAM block streamer and single OOM retry remain available.
 5. **Telemetry**. Each GPU reports `{ index, name, free_vram_mb, total_vram_mb, allocated_weight_pct, role }` where `role` is `active_full` | `active_tight_partial` | `bypassed_busy`. The Rust backend forwards this on `list_models`, WebSocket progress, and `job_status`; the UI renders live badges.
 
-Verification: `inference-worker/test_heterogeneous_vram.py` covers Case A (GPU0 busy → 0/50/50), Case B (~81/19 with GPU2 bypassed), and Case C (all tight → pinned block streaming).
+Verification: `inference-worker/test_heterogeneous_vram.py` covers Case A (GPU0 busy → 0/50/50), Case B (~81/19 with GPU2 bypassed), and Case C (all tight → raw-module pinned block streaming). `test_comfy_offload.py` checks that real ComfyUI patchers and subclasses keep their weight storage and forward hooks, native CUDA OOMs do not allocate a second cache, and raw modules retain their existing single retry. Run these tests inside the runtime image with its pinned ComfyUI version.
 
 ### 4.4. Resource Guardrails (checked before the limit is hit)
 

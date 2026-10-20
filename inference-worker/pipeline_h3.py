@@ -332,7 +332,19 @@ def _bind_module_device(obj, device):
                     pass
 
 
+def _comfy_manages_weights(module):
+    from comfy.model_patcher import ModelPatcher
+
+    return isinstance(module, ModelPatcher)
+
+
 def _apply_stage_shards(module, schedule, report, frac, label):
+    if _comfy_manages_weights(module):
+        # ComfyUI owns placement, pinning, and LoRA patches for these weights.
+        # Installing a second block streamer conflicts with its low-VRAM loader.
+        lead = str(module.load_device)
+        report(f"schedule_{label}", frac, f"{label}: ComfyUI weight offload on {lead}")
+        return {"mode": "comfy_offload", "lead_device": lead, "blocks_by_gpu": {}, "streamer": None}
     summary = apply_proportional_block_sharding(_unwrap_nn(module), schedule)
     mode = summary.get("mode")
     lead = summary.get("lead_device")
@@ -712,7 +724,7 @@ def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, che
     try:
         return _once()
     except Exception as exc:
-        if registry is None or not _cuda_oom(exc):
+        if registry is None or not _cuda_oom(exc) or _comfy_manages_weights(model):
             raise
         report("stage2_oom_recover", 0.30, "CUDA OOM — trimming and resuming via pinned block streaming")
         registry.trim_all_memory()
