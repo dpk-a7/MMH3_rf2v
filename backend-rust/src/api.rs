@@ -65,13 +65,13 @@ pub struct GenerationConfigDefaults {
 impl Default for GenerationConfigDefaults {
     fn default() -> Self {
         Self {
-            diffusion_model: "minimax_h3_ref2va_pruned_int8_convrot.safetensors".into(),
+            diffusion_model: "fasth3_omniref_8step_pruned_int8_convrot.safetensors".into(),
             video_vae_model: "minimax_h3_video_vae_fp16.safetensors".into(),
             audio_vae_model: "minimax_h3_audio_vae_fp32.safetensors".into(),
             clip_model: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors".into(),
             lora_model: "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors".into(),
             generation_mode: "normal".into(),
-            steps: 20,
+            steps: 8,
             normal_default_steps: 20,
             turbo_default_steps: 4,
             lora_strength: 1.0,

@@ -25,15 +25,19 @@ export interface GenerationState {
   controlEnd: number;
 }
 
+// FastH3 checkpoints are distilled to 8 steps; the base model takes 20, or 4 with the Turbo LoRA.
+export const stepsFor = (model: string, mode: "normal" | "turbo"): number =>
+  /fasth3/i.test(model) ? 8 : mode === "turbo" ? 4 : 20;
+
 export const FACTORY_DEFAULTS: GenerationState = {
-  diffusionModel: "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+  diffusionModel: "fasth3_omniref_8step_pruned_int8_convrot.safetensors",
   videoVaeModel: "minimax_h3_video_vae_fp16.safetensors",
   audioVaeModel: "minimax_h3_audio_vae_fp32.safetensors",
   clipModel: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
   loraModel: "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
   controlnetModel: "",
   mode: "normal",
-  steps: 20,
+  steps: 8,
   loraStrength: 1.0,
   aspectRatio: "16:9 (Widescreen)",
   megapixels: 0.4,
@@ -95,7 +99,7 @@ export function GenerationControls({
     setState((prev) => ({
       ...prev,
       mode: newMode,
-      steps: newMode === "turbo" ? 4 : 20,
+      steps: stepsFor(prev.diffusionModel, newMode),
     }));
   };
 
@@ -129,12 +133,7 @@ export function GenerationControls({
             value={state.diffusionModel}
             onChange={(event) => {
               const name = event.target.value;
-              // FastH3 checkpoints are distilled to 8 steps.
-              setState((prev) => ({
-                ...prev,
-                diffusionModel: name,
-                steps: /fasth3/i.test(name) ? 8 : prev.mode === "turbo" ? 4 : 20,
-              }));
+              setState((prev) => ({ ...prev, diffusionModel: name, steps: stepsFor(name, prev.mode) }));
             }}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm"
           >
@@ -245,7 +244,7 @@ export function GenerationControls({
           />
           <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
             <span>1</span>
-            <span>{state.mode === "turbo" ? "Recommended: 4" : "Recommended: 20"}</span>
+            <span>Recommended: {stepsFor(state.diffusionModel, state.mode)}</span>
             <span>{state.mode === "turbo" ? "20" : "50"}</span>
           </div>
         </div>
