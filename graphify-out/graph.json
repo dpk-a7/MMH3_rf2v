@@ -9,7 +9,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/tailwind.config.js",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_tailwind_config_js",
-      "community": 16,
+      "community": 17,
       "norm_label": "tailwind.config.js"
     },
     {
@@ -18,7 +18,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/postcss.config.js",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_postcss_config_js",
-      "community": 17,
+      "community": 18,
       "norm_label": "postcss.config.js"
     },
     {
@@ -27,7 +27,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/vite.config.ts",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_vite_config_ts",
-      "community": 18,
+      "community": 19,
       "norm_label": "vite.config.ts"
     },
     {
@@ -324,7 +324,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/main.tsx",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_src_main_tsx",
-      "community": 19,
+      "community": 20,
       "norm_label": "main.tsx"
     },
     {
@@ -333,7 +333,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/vite-env.d.ts",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_src_vite_env_d_ts",
-      "community": 20,
+      "community": 21,
       "norm_label": "vite-env.d.ts"
     },
     {
@@ -342,7 +342,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PromptTagEditor.tsx",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_src_components_prompttageditor_tsx",
-      "community": 13,
+      "community": 14,
       "norm_label": "prompttageditor.tsx"
     },
     {
@@ -351,7 +351,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PromptTagEditor.tsx",
       "source_location": "L7",
       "id": "prompttageditor_prompttageditor",
-      "community": 13,
+      "community": 14,
       "norm_label": "prompttageditor()"
     },
     {
@@ -360,7 +360,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PromptTagEditor.tsx",
       "source_location": "L58",
       "id": "prompttageditor_tagrow",
-      "community": 13,
+      "community": 14,
       "norm_label": "tagrow()"
     },
     {
@@ -369,7 +369,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PromptTagEditor.tsx",
       "source_location": "L84",
       "id": "prompttageditor_insertfrombutton",
-      "community": 13,
+      "community": 14,
       "norm_label": "insertfrombutton()"
     },
     {
@@ -405,25 +405,34 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_src_components_generationcontrols_tsx",
-      "community": 14,
+      "community": 15,
       "norm_label": "generationcontrols.tsx"
+    },
+    {
+      "label": "stepsFor()",
+      "file_type": "code",
+      "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
+      "source_location": "L29",
+      "id": "generationcontrols_stepsfor",
+      "community": 15,
+      "norm_label": "stepsfor()"
     },
     {
       "label": "handleModeChange()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
-      "source_location": "L94",
+      "source_location": "L98",
       "id": "generationcontrols_handlemodechange",
-      "community": 14,
+      "community": 15,
       "norm_label": "handlemodechange()"
     },
     {
       "label": "if()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
-      "source_location": "L491",
+      "source_location": "L490",
       "id": "generationcontrols_if",
-      "community": 14,
+      "community": 15,
       "norm_label": "if()"
     },
     {
@@ -432,7 +441,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PanicFlushButton.tsx",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_frontend_src_components_panicflushbutton_tsx",
-      "community": 15,
+      "community": 16,
       "norm_label": "panicflushbutton.tsx"
     },
     {
@@ -441,7 +450,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/PanicFlushButton.tsx",
       "source_location": "L3",
       "id": "panicflushbutton_panicflushbutton",
-      "community": 15,
+      "community": 16,
       "norm_label": "panicflushbutton()"
     },
     {
@@ -558,7 +567,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_backend_rust_src_crypto_rs",
-      "community": 8,
+      "community": 7,
       "norm_label": "crypto.rs"
     },
     {
@@ -567,7 +576,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L18",
       "id": "crypto_sessionkey",
-      "community": 8,
+      "community": 7,
       "norm_label": "sessionkey"
     },
     {
@@ -576,7 +585,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L23",
       "id": "crypto_sessionkey_new",
-      "community": 6,
+      "community": 0,
       "norm_label": ".new()"
     },
     {
@@ -585,7 +594,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L27",
       "id": "crypto_sessionkey_as_bytes",
-      "community": 8,
+      "community": 7,
       "norm_label": ".as_bytes()"
     },
     {
@@ -594,7 +603,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L33",
       "id": "crypto_cryptoerror",
-      "community": 8,
+      "community": 7,
       "norm_label": "cryptoerror"
     },
     {
@@ -603,7 +612,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L41",
       "id": "crypto_decode_public_key",
-      "community": 8,
+      "community": 7,
       "norm_label": "decode_public_key()"
     },
     {
@@ -612,7 +621,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L53",
       "id": "crypto_encode_public_key",
-      "community": 8,
+      "community": 7,
       "norm_label": "encode_public_key()"
     },
     {
@@ -621,7 +630,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L57",
       "id": "crypto_handshake",
-      "community": 8,
+      "community": 7,
       "norm_label": "handshake()"
     },
     {
@@ -630,7 +639,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L65",
       "id": "crypto_derive_session_key",
-      "community": 8,
+      "community": 7,
       "norm_label": "derive_session_key()"
     },
     {
@@ -639,7 +648,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L73",
       "id": "crypto_pad_block",
-      "community": 8,
+      "community": 7,
       "norm_label": "pad_block()"
     },
     {
@@ -648,7 +657,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L85",
       "id": "crypto_unpad_block",
-      "community": 8,
+      "community": 7,
       "norm_label": "unpad_block()"
     },
     {
@@ -657,7 +666,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L97",
       "id": "crypto_seal",
-      "community": 8,
+      "community": 7,
       "norm_label": "seal()"
     },
     {
@@ -666,7 +675,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L112",
       "id": "crypto_open",
-      "community": 8,
+      "community": 7,
       "norm_label": "open()"
     },
     {
@@ -675,7 +684,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L128",
       "id": "crypto_pad_roundtrip_and_block_alignment",
-      "community": 8,
+      "community": 7,
       "norm_label": "pad_roundtrip_and_block_alignment()"
     },
     {
@@ -684,7 +693,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/crypto.rs",
       "source_location": "L136",
       "id": "crypto_both_sides_derive_the_same_session_key",
-      "community": 8,
+      "community": 7,
       "norm_label": "both_sides_derive_the_same_session_key()"
     },
     {
@@ -693,7 +702,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_backend_rust_src_storage_rs",
-      "community": 6,
+      "community": 10,
       "norm_label": "storage.rs"
     },
     {
@@ -702,7 +711,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L8",
       "id": "storage_ephemeralstorage",
-      "community": 6,
+      "community": 10,
       "norm_label": "ephemeralstorage"
     },
     {
@@ -711,7 +720,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L15",
       "id": "storage_ephemeralstorage_create",
-      "community": 6,
+      "community": 10,
       "norm_label": ".create()"
     },
     {
@@ -720,7 +729,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L30",
       "id": "storage_ephemeralstorage_secure_remove_file",
-      "community": 6,
+      "community": 10,
       "norm_label": ".secure_remove_file()"
     },
     {
@@ -729,7 +738,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L64",
       "id": "storage_ephemeralstorage_run_ttl_reaper",
-      "community": 6,
+      "community": 10,
       "norm_label": ".run_ttl_reaper()"
     },
     {
@@ -738,7 +747,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L72",
       "id": "storage_ephemeralstorage_purge_expired",
-      "community": 6,
+      "community": 10,
       "norm_label": ".purge_expired()"
     },
     {
@@ -747,7 +756,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L79",
       "id": "storage_ephemeralstorage_purge_dir",
-      "community": 6,
+      "community": 10,
       "norm_label": ".purge_dir()"
     },
     {
@@ -756,7 +765,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L100",
       "id": "storage_ephemeralstorage_flush_all_now",
-      "community": 6,
+      "community": 10,
       "norm_label": ".flush_all_now()"
     },
     {
@@ -765,7 +774,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/storage.rs",
       "source_location": "L112",
       "id": "storage_restrict_dir",
-      "community": 6,
+      "community": 10,
       "norm_label": "restrict_dir()"
     },
     {
@@ -774,7 +783,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_backend_rust_src_math_rs",
-      "community": 0,
+      "community": 11,
       "norm_label": "math.rs"
     },
     {
@@ -783,7 +792,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L6",
       "id": "math_compute_dimensions",
-      "community": 0,
+      "community": 11,
       "norm_label": "compute_dimensions()"
     },
     {
@@ -792,7 +801,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L28",
       "id": "math_aspect_components",
-      "community": 0,
+      "community": 11,
       "norm_label": "aspect_components()"
     },
     {
@@ -801,7 +810,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L43",
       "id": "math_compute_aligned_frame_length",
-      "community": 0,
+      "community": 11,
       "norm_label": "compute_aligned_frame_length()"
     },
     {
@@ -810,7 +819,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L54",
       "id": "math_known_aspect",
-      "community": 0,
+      "community": 11,
       "norm_label": "known_aspect()"
     },
     {
@@ -819,7 +828,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L64",
       "id": "math_published_sixteen_by_nine_table",
-      "community": 0,
+      "community": 11,
       "norm_label": "published_sixteen_by_nine_table()"
     },
     {
@@ -828,7 +837,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L72",
       "id": "math_dimensions_stay_on_grid",
-      "community": 0,
+      "community": 11,
       "norm_label": "dimensions_stay_on_grid()"
     },
     {
@@ -837,7 +846,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L84",
       "id": "math_five_seconds_is_124_frames",
-      "community": 0,
+      "community": 11,
       "norm_label": "five_seconds_is_124_frames()"
     },
     {
@@ -846,7 +855,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs",
       "source_location": "L89",
       "id": "math_frame_length_is_congruent_five_mod_seventeen",
-      "community": 0,
+      "community": 11,
       "norm_label": "frame_length_is_congruent_five_mod_seventeen()"
     },
     {
@@ -999,7 +1008,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L181",
       "id": "api_router",
-      "community": 6,
+      "community": 0,
       "norm_label": "router()"
     },
     {
@@ -1026,7 +1035,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L212",
       "id": "api_handshake",
-      "community": 8,
+      "community": 7,
       "norm_label": "handshake()"
     },
     {
@@ -1035,7 +1044,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L240",
       "id": "api_envelope",
-      "community": 8,
+      "community": 7,
       "norm_label": "envelope()"
     },
     {
@@ -1377,7 +1386,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L1199",
       "id": "api_session_from_headers",
-      "community": 8,
+      "community": 7,
       "norm_label": "session_from_headers()"
     },
     {
@@ -1386,7 +1395,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L1204",
       "id": "api_sealed_error",
-      "community": 8,
+      "community": 7,
       "norm_label": "sealed_error()"
     },
     {
@@ -1395,7 +1404,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L1215",
       "id": "api_encode_envelope",
-      "community": 8,
+      "community": 7,
       "norm_label": "encode_envelope()"
     },
     {
@@ -1422,7 +1431,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs",
       "source_location": "L1307",
       "id": "api_sweep_sessions",
-      "community": 6,
+      "community": 0,
       "norm_label": "sweep_sessions()"
     },
     {
@@ -1431,7 +1440,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_backend_rust_src_main_rs",
-      "community": 6,
+      "community": 0,
       "norm_label": "main.rs"
     },
     {
@@ -1440,7 +1449,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L22",
       "id": "main_main",
-      "community": 6,
+      "community": 0,
       "norm_label": "main()"
     },
     {
@@ -1449,7 +1458,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L36",
       "id": "main_run",
-      "community": 6,
+      "community": 0,
       "norm_label": "run()"
     },
     {
@@ -1458,7 +1467,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L70",
       "id": "main_build_tls",
-      "community": 6,
+      "community": 0,
       "norm_label": "build_tls()"
     },
     {
@@ -1467,7 +1476,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L102",
       "id": "main_bind_addr",
-      "community": 6,
+      "community": 0,
       "norm_label": "bind_addr()"
     },
     {
@@ -1476,7 +1485,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L109",
       "id": "main_model_root",
-      "community": 6,
+      "community": 0,
       "norm_label": "model_root()"
     },
     {
@@ -1485,7 +1494,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L120",
       "id": "main_static_dir",
-      "community": 6,
+      "community": 0,
       "norm_label": "static_dir()"
     },
     {
@@ -1494,7 +1503,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L131",
       "id": "main_ephemeral_root",
-      "community": 6,
+      "community": 0,
       "norm_label": "ephemeral_root()"
     },
     {
@@ -1503,7 +1512,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs",
       "source_location": "L144",
       "id": "main_sock_path",
-      "community": 6,
+      "community": 0,
       "norm_label": "sock_path()"
     },
     {
@@ -1512,7 +1521,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_inference_worker_test_stage1_clip_py",
-      "community": 11,
+      "community": 13,
       "norm_label": "test_stage1_clip.py"
     },
     {
@@ -1521,7 +1530,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L13",
       "id": "test_stage1_clip_stage1clipvramtests",
-      "community": 11,
+      "community": 13,
       "norm_label": "stage1clipvramtests"
     },
     {
@@ -1530,7 +1539,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L14",
       "id": "test_stage1_clip_stage1clipvramtests_test_one_ref_image_reserves_9gb",
-      "community": 11,
+      "community": 13,
       "norm_label": ".test_one_ref_image_reserves_9gb()"
     },
     {
@@ -1539,7 +1548,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L21",
       "id": "test_stage1_clip_stage1clipvramtests_test_clip_load_without_tokens_still_reserves_9gb",
-      "community": 11,
+      "community": 13,
       "norm_label": ".test_clip_load_without_tokens_still_reserves_9gb()"
     },
     {
@@ -1548,7 +1557,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L24",
       "id": "test_stage1_clip_stage1clipvramtests_test_dit_and_lora_load_after_stage1_encode",
-      "community": 11,
+      "community": 13,
       "norm_label": ".test_dit_and_lora_load_after_stage1_encode()"
     },
     {
@@ -1557,7 +1566,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_stage1_clip.py",
       "source_location": "L30",
       "id": "test_stage1_clip_stage1clipvramtests_test_cuda_oom_detects_wrapped_and_cublas",
-      "community": 11,
+      "community": 13,
       "norm_label": ".test_cuda_oom_detects_wrapped_and_cublas()"
     },
     {
@@ -1566,7 +1575,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_runtime_jit.py",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_inference_worker_test_runtime_jit_py",
-      "community": 6,
+      "community": 0,
       "norm_label": "test_runtime_jit.py"
     },
     {
@@ -1575,7 +1584,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_runtime_jit.py",
       "source_location": "L11",
       "id": "test_runtime_jit_runtimejittests",
-      "community": 6,
+      "community": 0,
       "norm_label": "runtimejittests"
     },
     {
@@ -1584,7 +1593,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_runtime_jit.py",
       "source_location": "L12",
       "id": "test_runtime_jit_runtimejittests_test_python_extension_loads_from_runtime_cache",
-      "community": 6,
+      "community": 0,
       "norm_label": ".test_python_extension_loads_from_runtime_cache()"
     },
     {
@@ -1863,7 +1872,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_inference_worker_test_comfy_offload_py",
-      "community": 9,
+      "community": 8,
       "norm_label": "test_comfy_offload.py"
     },
     {
@@ -1872,7 +1881,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L12",
       "id": "test_comfy_offload_tinystack",
-      "community": 9,
+      "community": 8,
       "norm_label": "tinystack"
     },
     {
@@ -1881,7 +1890,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L13",
       "id": "test_comfy_offload_tinystack_init",
-      "community": 9,
+      "community": 8,
       "norm_label": ".__init__()"
     },
     {
@@ -1890,7 +1899,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L18",
       "id": "test_comfy_offload_patchersubclass",
-      "community": 9,
+      "community": 8,
       "norm_label": "patchersubclass"
     },
     {
@@ -1899,7 +1908,7 @@
       "source_file": "",
       "source_location": "",
       "id": "modelpatcher",
-      "community": 9,
+      "community": 8,
       "norm_label": "modelpatcher"
     },
     {
@@ -1908,7 +1917,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L22",
       "id": "test_comfy_offload_recordingregistry",
-      "community": 9,
+      "community": 8,
       "norm_label": "recordingregistry"
     },
     {
@@ -1917,7 +1926,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L23",
       "id": "test_comfy_offload_recordingregistry_init",
-      "community": 9,
+      "community": 8,
       "norm_label": ".__init__()"
     },
     {
@@ -1926,7 +1935,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L28",
       "id": "test_comfy_offload_recordingregistry_trim_all_memory",
-      "community": 9,
+      "community": 8,
       "norm_label": ".trim_all_memory()"
     },
     {
@@ -1935,7 +1944,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L31",
       "id": "test_comfy_offload_recordingregistry_probe_and_plan",
-      "community": 9,
+      "community": 8,
       "norm_label": ".probe_and_plan()"
     },
     {
@@ -1944,7 +1953,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L36",
       "id": "test_comfy_offload_comfyoffloadtests",
-      "community": 9,
+      "community": 8,
       "norm_label": "comfyoffloadtests"
     },
     {
@@ -1953,7 +1962,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L37",
       "id": "test_comfy_offload_comfyoffloadtests_setup",
-      "community": 9,
+      "community": 8,
       "norm_label": ".setup()"
     },
     {
@@ -1962,7 +1971,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L44",
       "id": "test_comfy_offload_comfyoffloadtests_test_comfy_patchers_keep_their_weight_storage_and_forward_hooks",
-      "community": 9,
+      "community": 8,
       "norm_label": ".test_comfy_patchers_keep_their_weight_storage_and_forward_hooks()"
     },
     {
@@ -1971,7 +1980,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L58",
       "id": "test_comfy_offload_comfyoffloadtests_sample",
-      "community": 9,
+      "community": 8,
       "norm_label": ".sample()"
     },
     {
@@ -1980,7 +1989,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L63",
       "id": "test_comfy_offload_comfyoffloadtests_test_native_cuda_oom_does_not_build_a_second_weight_cache",
-      "community": 9,
+      "community": 8,
       "norm_label": ".test_native_cuda_oom_does_not_build_a_second_weight_cache()"
     },
     {
@@ -1989,7 +1998,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_comfy_offload.py",
       "source_location": "L77",
       "id": "test_comfy_offload_comfyoffloadtests_test_raw_modules_retain_the_existing_single_streaming_retry",
-      "community": 9,
+      "community": 8,
       "norm_label": ".test_raw_modules_retain_the_existing_single_streaming_retry()"
     },
     {
@@ -2142,7 +2151,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L1",
       "id": "home_deepak_deepakproj_mmh3_inference_worker_test_attention_patches_py",
-      "community": 10,
+      "community": 9,
       "norm_label": "test_attention_patches.py"
     },
     {
@@ -2151,7 +2160,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L10",
       "id": "test_attention_patches_tiny_h3",
-      "community": 10,
+      "community": 9,
       "norm_label": "tiny_h3()"
     },
     {
@@ -2160,7 +2169,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L23",
       "id": "test_attention_patches_block_patches",
-      "community": 10,
+      "community": 9,
       "norm_label": "block_patches()"
     },
     {
@@ -2169,7 +2178,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L28",
       "id": "test_attention_patches_attentionpatchtests",
-      "community": 10,
+      "community": 9,
       "norm_label": "attentionpatchtests"
     },
     {
@@ -2178,7 +2187,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L29",
       "id": "test_attention_patches_attentionpatchtests_test_base_model_gets_kitchen_attention_and_keeps_res_multistep",
-      "community": 10,
+      "community": 9,
       "norm_label": ".test_base_model_gets_kitchen_attention_and_keeps_res_multistep()"
     },
     {
@@ -2187,7 +2196,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L35",
       "id": "test_attention_patches_attentionpatchtests_test_fasth3_gets_vsa_on_every_block_and_euler",
-      "community": 10,
+      "community": 9,
       "norm_label": ".test_fasth3_gets_vsa_on_every_block_and_euler()"
     },
     {
@@ -2196,7 +2205,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L40",
       "id": "test_attention_patches_attentionpatchtests_test_fasth3_stays_dense_under_controlnet",
-      "community": 10,
+      "community": 9,
       "norm_label": ".test_fasth3_stays_dense_under_controlnet()"
     },
     {
@@ -2204,9 +2213,9 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L11",
-      "id": "test_attention_patches_rationale_11",
-      "community": 10,
-      "norm_label": "two-block minimax h3 dit; `vsa` adds the to_gate_compress layers fasth3 checkpoi"
+      "community": 9,
+      "norm_label": "two-block minimax h3 dit; `vsa` adds the to_gate_compress layers fasth3 checkpoi",
+      "id": "test_attention_patches_rationale_11"
     },
     {
       "label": "test_reference_audio.py",
@@ -2430,7 +2439,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L27",
       "id": "pipeline_h3_jobaborted",
-      "community": 7,
+      "community": 6,
       "norm_label": "jobaborted"
     },
     {
@@ -2439,7 +2448,7 @@
       "source_file": "",
       "source_location": "",
       "id": "exception",
-      "community": 7,
+      "community": 6,
       "norm_label": "exception"
     },
     {
@@ -2457,7 +2466,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L35",
       "id": "pipeline_h3_muxfailed",
-      "community": 7,
+      "community": 6,
       "norm_label": "muxfailed"
     },
     {
@@ -2484,7 +2493,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L57",
       "id": "pipeline_h3_check_vram_gate",
-      "community": 7,
+      "community": 6,
       "norm_label": "check_vram_gate()"
     },
     {
@@ -2538,7 +2547,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L237",
       "id": "pipeline_h3_clip_activation_bytes",
-      "community": 11,
+      "community": 13,
       "norm_label": "clip_activation_bytes()"
     },
     {
@@ -2563,7 +2572,7 @@
       "label": "_load_unet()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L279",
+      "source_location": "L284",
       "id": "pipeline_h3_load_unet",
       "community": 2,
       "norm_label": "_load_unet()"
@@ -2572,7 +2581,7 @@
       "label": "_load_lora()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L285",
+      "source_location": "L292",
       "id": "pipeline_h3_load_lora",
       "community": 2,
       "norm_label": "_load_lora()"
@@ -2581,7 +2590,7 @@
       "label": "_load_controlnet()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L291",
+      "source_location": "L298",
       "id": "pipeline_h3_load_controlnet",
       "community": 2,
       "norm_label": "_load_controlnet()"
@@ -2590,7 +2599,7 @@
       "label": "_unload_device()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L297",
+      "source_location": "L304",
       "id": "pipeline_h3_unload_device",
       "community": 2,
       "norm_label": "_unload_device()"
@@ -2599,16 +2608,16 @@
       "label": "_unwrap_nn()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L304",
+      "source_location": "L311",
       "id": "pipeline_h3_unwrap_nn",
-      "community": 2,
+      "community": 3,
       "norm_label": "_unwrap_nn()"
     },
     {
       "label": "_bind_module_device()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L313",
+      "source_location": "L320",
       "id": "pipeline_h3_bind_module_device",
       "community": 2,
       "norm_label": "_bind_module_device()"
@@ -2617,25 +2626,25 @@
       "label": "_comfy_manages_weights()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L335",
+      "source_location": "L342",
       "id": "pipeline_h3_comfy_manages_weights",
-      "community": 2,
+      "community": 3,
       "norm_label": "_comfy_manages_weights()"
     },
     {
       "label": "_apply_stage_shards()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L341",
+      "source_location": "L348",
       "id": "pipeline_h3_apply_stage_shards",
-      "community": 2,
+      "community": 3,
       "norm_label": "_apply_stage_shards()"
     },
     {
       "label": "_tighten_video_vae()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L360",
+      "source_location": "L367",
       "id": "pipeline_h3_tighten_video_vae",
       "community": 2,
       "norm_label": "_tighten_video_vae()"
@@ -2644,7 +2653,7 @@
       "label": "_failure_text()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L373",
+      "source_location": "L380",
       "id": "pipeline_h3_failure_text",
       "community": 3,
       "norm_label": "_failure_text()"
@@ -2653,7 +2662,7 @@
       "label": "_cuda_oom()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L378",
+      "source_location": "L385",
       "id": "pipeline_h3_cuda_oom",
       "community": 3,
       "norm_label": "_cuda_oom()"
@@ -2662,7 +2671,7 @@
       "label": "_count_refs()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L395",
+      "source_location": "L402",
       "id": "pipeline_h3_count_refs",
       "community": 3,
       "norm_label": "_count_refs()"
@@ -2671,7 +2680,7 @@
       "label": "_at()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L400",
+      "source_location": "L407",
       "id": "pipeline_h3_at",
       "community": 2,
       "norm_label": "_at()"
@@ -2680,7 +2689,7 @@
       "label": "run_job()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L405",
+      "source_location": "L412",
       "id": "pipeline_h3_run_job",
       "community": 3,
       "norm_label": "run_job()"
@@ -2689,7 +2698,7 @@
       "label": "_run_job_inner()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L463",
+      "source_location": "L470",
       "id": "pipeline_h3_run_job_inner",
       "community": 3,
       "norm_label": "_run_job_inner()"
@@ -2698,7 +2707,7 @@
       "label": "_stage1_condition()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L602",
+      "source_location": "L612",
       "id": "pipeline_h3_stage1_condition",
       "community": 2,
       "norm_label": "_stage1_condition()"
@@ -2707,7 +2716,7 @@
       "label": "_reference_pack()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L626",
+      "source_location": "L636",
       "id": "pipeline_h3_reference_pack",
       "community": 2,
       "norm_label": "_reference_pack()"
@@ -2716,7 +2725,7 @@
       "label": "_audio_payload()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L658",
+      "source_location": "L668",
       "id": "pipeline_h3_audio_payload",
       "community": 2,
       "norm_label": "_audio_payload()"
@@ -2725,7 +2734,7 @@
       "label": "_apply_controlnet()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L663",
+      "source_location": "L673",
       "id": "pipeline_h3_apply_controlnet",
       "community": 2,
       "norm_label": "_apply_controlnet()"
@@ -2734,34 +2743,34 @@
       "label": "_is_fasth3()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L701",
+      "source_location": "L711",
       "id": "pipeline_h3_is_fasth3",
-      "community": 10,
+      "community": 9,
       "norm_label": "_is_fasth3()"
     },
     {
       "label": "_has_control()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L707",
+      "source_location": "L717",
       "id": "pipeline_h3_has_control",
-      "community": 10,
+      "community": 9,
       "norm_label": "_has_control()"
     },
     {
       "label": "_patch_attention()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L711",
+      "source_location": "L721",
       "id": "pipeline_h3_patch_attention",
-      "community": 10,
+      "community": 9,
       "norm_label": "_patch_attention()"
     },
     {
       "label": "_stage2_sample()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L730",
+      "source_location": "L740",
       "id": "pipeline_h3_stage2_sample",
       "community": 3,
       "norm_label": "_stage2_sample()"
@@ -2770,7 +2779,7 @@
       "label": "_hook_progress()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L765",
+      "source_location": "L775",
       "id": "pipeline_h3_hook_progress",
       "community": 2,
       "norm_label": "_hook_progress()"
@@ -2779,7 +2788,7 @@
       "label": "_stage3_decode()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L788",
+      "source_location": "L798",
       "id": "pipeline_h3_stage3_decode",
       "community": 2,
       "norm_label": "_stage3_decode()"
@@ -2788,7 +2797,7 @@
       "label": "_decode_audio()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L813",
+      "source_location": "L823",
       "id": "pipeline_h3_decode_audio",
       "community": 2,
       "norm_label": "_decode_audio()"
@@ -2797,7 +2806,7 @@
       "label": "_waveform_48k()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L820",
+      "source_location": "L830",
       "id": "pipeline_h3_waveform_48k",
       "community": 2,
       "norm_label": "_waveform_48k()"
@@ -2806,7 +2815,7 @@
       "label": "_ephemeral_root()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L838",
+      "source_location": "L848",
       "id": "pipeline_h3_ephemeral_root",
       "community": 2,
       "norm_label": "_ephemeral_root()"
@@ -2815,7 +2824,7 @@
       "label": "_require_media()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L842",
+      "source_location": "L852",
       "id": "pipeline_h3_require_media",
       "community": 2,
       "norm_label": "_require_media()"
@@ -2824,7 +2833,7 @@
       "label": "_load_image()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L852",
+      "source_location": "L862",
       "id": "pipeline_h3_load_image",
       "community": 2,
       "norm_label": "_load_image()"
@@ -2833,7 +2842,7 @@
       "label": "_resize_image()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L864",
+      "source_location": "L874",
       "id": "pipeline_h3_resize_image",
       "community": 2,
       "norm_label": "_resize_image()"
@@ -2842,7 +2851,7 @@
       "label": "_load_video()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L883",
+      "source_location": "L893",
       "id": "pipeline_h3_load_video",
       "community": 2,
       "norm_label": "_load_video()"
@@ -2851,7 +2860,7 @@
       "label": "_ffmpeg_threads()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L888",
+      "source_location": "L898",
       "id": "pipeline_h3_ffmpeg_threads",
       "community": 2,
       "norm_label": "_ffmpeg_threads()"
@@ -2860,7 +2869,7 @@
       "label": "_load_video_native()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L893",
+      "source_location": "L903",
       "id": "pipeline_h3_load_video_native",
       "community": 2,
       "norm_label": "_load_video_native()"
@@ -2869,7 +2878,7 @@
       "label": "_largest_aligned()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L937",
+      "source_location": "L947",
       "id": "pipeline_h3_largest_aligned",
       "community": 2,
       "norm_label": "_largest_aligned()"
@@ -2878,7 +2887,7 @@
       "label": "_load_audio_full()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L949",
+      "source_location": "L959",
       "id": "pipeline_h3_load_audio_full",
       "community": 2,
       "norm_label": "_load_audio_full()"
@@ -2887,7 +2896,7 @@
       "label": "_ffprobe_size()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L990",
+      "source_location": "L1000",
       "id": "pipeline_h3_ffprobe_size",
       "community": 2,
       "norm_label": "_ffprobe_size()"
@@ -2896,7 +2905,7 @@
       "label": "_ffmpeg_raw()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1025",
+      "source_location": "L1035",
       "id": "pipeline_h3_ffmpeg_raw",
       "community": 2,
       "norm_label": "_ffmpeg_raw()"
@@ -2905,7 +2914,7 @@
       "label": "_mux()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1035",
+      "source_location": "L1045",
       "id": "pipeline_h3_mux",
       "community": 2,
       "norm_label": "_mux()"
@@ -2914,7 +2923,7 @@
       "label": "_secure_unlink()",
       "file_type": "code",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1159",
+      "source_location": "L1169",
       "id": "pipeline_h3_secure_unlink",
       "community": 2,
       "norm_label": "_secure_unlink()"
@@ -2924,7 +2933,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L28",
-      "community": 7,
+      "community": 6,
       "norm_label": "a reference image, video, or audio clip failed validation.",
       "id": "pipeline_h3_rationale_28"
     },
@@ -2942,7 +2951,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L36",
-      "community": 7,
+      "community": 6,
       "norm_label": "comfyui model object moved with the 3-stage pinned-ram registry.",
       "id": "pipeline_h3_rationale_36"
     },
@@ -2960,7 +2969,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L58",
-      "community": 7,
+      "community": 6,
       "norm_label": "activations cannot be streamed like weights: they must fit on the dit gpu.",
       "id": "pipeline_h3_rationale_58"
     },
@@ -2969,7 +2978,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L238",
-      "community": 11,
+      "community": 13,
       "norm_label": "activation budget comfyui must keep free before qwen3-vl encode.      cliploader",
       "id": "pipeline_h3_rationale_238"
     },
@@ -2977,27 +2986,27 @@
       "label": "Pack reference latents in prompt order: images, then each soundtrack before its",
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L627",
+      "source_location": "L637",
+      "id": "pipeline_h3_rationale_637",
       "community": 2,
-      "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
-      "id": "pipeline_h3_rationale_627"
-    },
-    {
-      "label": "FastH3 checkpoints are VSA-trained and ship its coarse-attention gates.",
-      "file_type": "rationale",
-      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L702",
-      "id": "pipeline_h3_rationale_702",
-      "community": 10,
-      "norm_label": "fasth3 checkpoints are vsa-trained and ship its coarse-attention gates."
+      "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its"
     },
     {
       "label": "Same model patches as ComfyUI's H3 templates; returns (model, sampler name).",
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L712",
-      "id": "pipeline_h3_rationale_712",
-      "community": 10,
+      "community": 9,
+      "norm_label": "same model patches as comfyui's h3 templates; returns (model, sampler name).",
+      "id": "pipeline_h3_rationale_712"
+    },
+    {
+      "label": "Same model patches as ComfyUI's H3 templates; returns (model, sampler name).",
+      "file_type": "rationale",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L722",
+      "id": "pipeline_h3_rationale_722",
+      "community": 9,
       "norm_label": "same model patches as comfyui's h3 templates; returns (model, sampler name)."
     },
     {
@@ -3015,7 +3024,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L34",
       "id": "memory_manager_resourcelimitexceeded",
-      "community": 7,
+      "community": 6,
       "norm_label": "resourcelimitexceeded"
     },
     {
@@ -3033,7 +3042,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L50",
       "id": "memory_manager_device",
-      "community": 9,
+      "community": 8,
       "norm_label": "device()"
     },
     {
@@ -3078,7 +3087,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L84",
       "id": "memory_manager_read_int",
-      "community": 8,
+      "community": 7,
       "norm_label": "_read_int()"
     },
     {
@@ -3087,7 +3096,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L98",
       "id": "memory_manager_cgroup_ram",
-      "community": 8,
+      "community": 7,
       "norm_label": "_cgroup_ram()"
     },
     {
@@ -3096,7 +3105,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L116",
       "id": "memory_manager_host_ram_info",
-      "community": 3,
+      "community": 7,
       "norm_label": "host_ram_info()"
     },
     {
@@ -3159,7 +3168,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L194",
       "id": "memory_manager_pynvml_snapshot",
-      "community": 6,
+      "community": 3,
       "norm_label": "_pynvml_snapshot()"
     },
     {
@@ -3177,7 +3186,7 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L325",
       "id": "memory_manager_elect_lead_device",
-      "community": 9,
+      "community": 8,
       "norm_label": "elect_lead_device()"
     },
     {
@@ -3392,7 +3401,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L35",
-      "community": 7,
+      "community": 6,
       "norm_label": "pre-flight vram/ram/tmpfs safety gate blocked the job before oom.",
       "id": "memory_manager_rationale_35"
     },
@@ -3401,7 +3410,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L99",
-      "community": 8,
+      "community": 7,
       "norm_label": "(available, limit) inside a cgroup-v2 memory limit, or none when unlimited.",
       "id": "memory_manager_rationale_99"
     },
@@ -3410,7 +3419,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L117",
-      "community": 3,
+      "community": 7,
       "norm_label": "return (available_bytes, total_bytes), honouring the container memory limit.",
       "id": "memory_manager_rationale_117"
     },
@@ -3419,7 +3428,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L195",
-      "community": 6,
+      "community": 3,
       "norm_label": "query pynvml (or nvidia-smi fallback) for {index: (name, free_bytes, total_bytes",
       "id": "memory_manager_rationale_195"
     },
@@ -3437,7 +3446,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L326",
-      "community": 9,
+      "community": 8,
       "norm_label": "elect `lead_device = argmax(usable_vram)` with zero `cuda:0` anchoring.",
       "id": "memory_manager_rationale_326"
     },
@@ -3508,8 +3517,26 @@
       "label": "Pack reference latents in prompt order: images, then each soundtrack before its",
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L627",
+      "community": 6,
+      "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
+      "id": "pipeline_h3_rationale_627"
+    },
+    {
+      "label": "FastH3 checkpoints are VSA-trained and ship its coarse-attention gates.",
+      "file_type": "rationale",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L702",
+      "community": 6,
+      "norm_label": "fasth3 checkpoints are vsa-trained and ship its coarse-attention gates.",
+      "id": "pipeline_h3_rationale_702"
+    },
+    {
+      "label": "Pack reference latents in prompt order: images, then each soundtrack before its",
+      "file_type": "rationale",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L615",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_615"
     },
@@ -3518,7 +3545,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L200",
-      "community": 7,
+      "community": 6,
       "norm_label": "runs generate and flush commands strictly one at a time.",
       "id": "worker_daemon_rationale_200"
     },
@@ -3527,7 +3554,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L600",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_600"
     },
@@ -3536,7 +3563,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L188",
-      "community": 7,
+      "community": 6,
       "norm_label": "runs generate and flush commands strictly one at a time.",
       "id": "worker_daemon_rationale_188"
     },
@@ -3545,7 +3572,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L564",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_564"
     },
@@ -3554,7 +3581,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L185",
-      "community": 7,
+      "community": 6,
       "norm_label": "runs generate and flush commands strictly one at a time.",
       "id": "worker_daemon_rationale_185"
     },
@@ -3563,7 +3590,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L25",
-      "community": 7,
+      "community": 6,
       "norm_label": "the caller aborted the running generation.",
       "id": "pipeline_h3_rationale_25"
     },
@@ -3572,7 +3599,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L29",
-      "community": 7,
+      "community": 6,
       "norm_label": "a reference image, video, or audio clip failed validation.",
       "id": "pipeline_h3_rationale_29"
     },
@@ -3581,7 +3608,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L33",
-      "community": 7,
+      "community": 6,
       "norm_label": "bitexact ffmpeg muxing did not produce an output file.",
       "id": "pipeline_h3_rationale_33"
     },
@@ -3590,7 +3617,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L45",
-      "community": 7,
+      "community": 6,
       "norm_label": "reject before allocating when decoded frames would not fit in ram or /app/epheme",
       "id": "pipeline_h3_rationale_45"
     },
@@ -3599,7 +3626,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L55",
-      "community": 7,
+      "community": 6,
       "norm_label": "activations cannot be streamed like weights: they must fit on the dit gpu.",
       "id": "pipeline_h3_rationale_55"
     },
@@ -3608,7 +3635,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L454",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_454"
     },
@@ -3617,7 +3644,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L16",
-      "community": 21,
+      "community": 22,
       "norm_label": "pre-flight vram/ram/tmpfs safety gate blocked the job before oom.",
       "id": "memory_manager_rationale_16"
     },
@@ -3626,7 +3653,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L34",
-      "community": 22,
+      "community": 23,
       "norm_label": "(available, limit) inside a cgroup-v2 memory limit, or none when unlimited.",
       "id": "memory_manager_rationale_34"
     },
@@ -3635,7 +3662,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L52",
-      "community": 23,
+      "community": 24,
       "norm_label": "return (available_bytes, total_bytes), honouring the container memory limit.",
       "id": "memory_manager_rationale_52"
     },
@@ -3644,7 +3671,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L86",
-      "community": 24,
+      "community": 25,
       "norm_label": "physical index -> (free_bytes, total_bytes) without creating cuda contexts.",
       "id": "memory_manager_rationale_86"
     },
@@ -3653,7 +3680,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L122",
-      "community": 25,
+      "community": 26,
       "norm_label": "[(torch_index, free_bytes, total_bytes)] for every visible cuda device.",
       "id": "memory_manager_rationale_122"
     },
@@ -3662,7 +3689,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L146",
-      "community": 26,
+      "community": 27,
       "norm_label": "one model per gpu: dit on the emptiest card, text encoder + vaes on the next one",
       "id": "memory_manager_rationale_146"
     },
@@ -3671,7 +3698,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L184",
-      "community": 27,
+      "community": 28,
       "norm_label": "caches one comfyui model object per slot; comfyui itself manages vram residency.",
       "id": "memory_manager_rationale_184"
     },
@@ -3680,7 +3707,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L170",
-      "community": 7,
+      "community": 6,
       "norm_label": "runs generate and flush commands strictly one at a time.",
       "id": "worker_daemon_rationale_170"
     },
@@ -3689,7 +3716,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L318",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_318"
     },
@@ -3698,7 +3725,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L109",
-      "community": 28,
+      "community": 29,
       "norm_label": "[(torch_index, free_bytes, total_bytes)] for every visible cuda device.",
       "id": "memory_manager_rationale_109"
     },
@@ -3707,7 +3734,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L130",
-      "community": 29,
+      "community": 30,
       "norm_label": "one model per gpu: dit on the emptiest card, text encoder + vaes on the next one",
       "id": "memory_manager_rationale_130"
     },
@@ -3716,7 +3743,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L168",
-      "community": 30,
+      "community": 31,
       "norm_label": "caches one comfyui model object per slot; comfyui itself manages vram residency.",
       "id": "memory_manager_rationale_168"
     },
@@ -3725,7 +3752,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L307",
-      "community": 7,
+      "community": 6,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_307"
     },
@@ -3734,7 +3761,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L15",
-      "community": 31,
+      "community": 32,
       "norm_label": "pre-flight vram/ram/tmpfs safety gate blocked the job before oom.",
       "id": "memory_manager_rationale_15"
     },
@@ -3743,7 +3770,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L33",
-      "community": 32,
+      "community": 33,
       "norm_label": "(available, limit) inside a cgroup-v2 memory limit, or none when unlimited.",
       "id": "memory_manager_rationale_33"
     },
@@ -3752,7 +3779,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L51",
-      "community": 33,
+      "community": 34,
       "norm_label": "return (available_bytes, total_bytes), honouring the container memory limit.",
       "id": "memory_manager_rationale_51"
     },
@@ -3761,7 +3788,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L85",
-      "community": 34,
+      "community": 35,
       "norm_label": "physical index -> (free_bytes, total_bytes) without creating cuda contexts.",
       "id": "memory_manager_rationale_85"
     },
@@ -3770,7 +3797,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L108",
-      "community": 35,
+      "community": 36,
       "norm_label": "[(torch_index, free_bytes, total_bytes)] for every visible cuda device.",
       "id": "memory_manager_rationale_108"
     },
@@ -3779,7 +3806,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L129",
-      "community": 36,
+      "community": 37,
       "norm_label": "one model per gpu: dit on the emptiest card, text encoder + vaes on the next one",
       "id": "memory_manager_rationale_129"
     },
@@ -3788,7 +3815,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L167",
-      "community": 37,
+      "community": 38,
       "norm_label": "caches one comfyui model object per slot; comfyui itself manages vram residency.",
       "id": "memory_manager_rationale_167"
     },
@@ -3797,7 +3824,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L29",
-      "community": 38,
+      "community": 39,
       "norm_label": "return the rank-0 error string when any rank failed. collective when n>1.",
       "id": "parallel_shard_rationale_29"
     },
@@ -3806,7 +3833,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L184",
-      "community": 39,
+      "community": 40,
       "norm_label": "exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start",
       "id": "parallel_shard_rationale_184"
     },
@@ -3815,7 +3842,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L256",
-      "community": 40,
+      "community": 41,
       "norm_label": "exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start",
       "id": "parallel_shard_rationale_256"
     },
@@ -3824,7 +3851,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L377",
-      "community": 41,
+      "community": 42,
       "norm_label": "column-slice a stacked [q; k; v] matrix so each rank owns the same heads of all",
       "id": "parallel_shard_rationale_377"
     },
@@ -3833,7 +3860,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L393",
-      "community": 42,
+      "community": 43,
       "norm_label": "column-slice a swiglu gate||up matrix so each rank owns matching rows of both ha",
       "id": "parallel_shard_rationale_393"
     },
@@ -3842,7 +3869,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L435",
-      "community": 43,
+      "community": 44,
       "norm_label": "replace dit and qwen3-vl qkv / o projections and swiglu/ffn linears with checkpo",
       "id": "parallel_shard_rationale_435"
     },
@@ -3851,7 +3878,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py",
       "source_location": "L79",
-      "community": 7,
+      "community": 6,
       "norm_label": "return (csv_devices, count) skipping gpus heavily occupied by external workloads",
       "id": "worker_daemon_rationale_79"
     },
@@ -3860,7 +3887,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L37",
-      "community": 44,
+      "community": 45,
       "norm_label": "comfyui model object moved with the 3-stage pinned-ram registry and comfyui-styl",
       "id": "pipeline_h3_rationale_37"
     },
@@ -3869,7 +3896,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L49",
-      "community": 45,
+      "community": 46,
       "norm_label": "verify host ram, gpu vram, and /app/ephemeral tmpfs headroom before allocating.",
       "id": "pipeline_h3_rationale_49"
     },
@@ -3878,7 +3905,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L81",
-      "community": 46,
+      "community": 47,
       "norm_label": "comfyui model object moved with the 3-stage pinned-ram registry and comfyui-styl",
       "id": "pipeline_h3_rationale_81"
     },
@@ -3887,7 +3914,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L732",
-      "community": 47,
+      "community": 48,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_732"
     },
@@ -3896,7 +3923,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L12",
-      "community": 48,
+      "community": 49,
       "norm_label": "full checkpoint resident in pinned host ram, moved stage by stage.",
       "id": "memory_manager_rationale_12"
     },
@@ -3905,7 +3932,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L189",
-      "community": 49,
+      "community": 50,
       "norm_label": "return (available_bytes, total_bytes) from /proc/meminfo with safe fallback.",
       "id": "memory_manager_rationale_189"
     },
@@ -3914,7 +3941,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L209",
-      "community": 50,
+      "community": 51,
       "norm_label": "comfyui-style pin budget guard: keep >= max(8 gb, 12% of ram) headroom unpinned.",
       "id": "memory_manager_rationale_209"
     },
@@ -3923,7 +3950,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py",
       "source_location": "L216",
-      "community": 51,
+      "community": 52,
       "norm_label": "comfyui-style usable vram budget for model weights on `device`.",
       "id": "memory_manager_rationale_216"
     },
@@ -3932,7 +3959,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L644",
-      "community": 52,
+      "community": 53,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_644"
     },
@@ -3941,7 +3968,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L121",
-      "community": 53,
+      "community": 54,
       "norm_label": "sequence-parallel attention. q/k/v are [b, h, s, d] and replicated.",
       "id": "parallel_shard_rationale_121"
     },
@@ -3950,7 +3977,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L188",
-      "community": 54,
+      "community": 55,
       "norm_label": "exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start",
       "id": "parallel_shard_rationale_188"
     },
@@ -3959,7 +3986,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L309",
-      "community": 55,
+      "community": 56,
       "norm_label": "column-slice a stacked [q; k; v] matrix so each rank owns the same heads of all",
       "id": "parallel_shard_rationale_309"
     },
@@ -3968,7 +3995,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L325",
-      "community": 56,
+      "community": 57,
       "norm_label": "column-slice a swiglu gate||up matrix so each rank owns matching rows of both ha",
       "id": "parallel_shard_rationale_325"
     },
@@ -3977,7 +4004,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L367",
-      "community": 57,
+      "community": 58,
       "norm_label": "replace dit and qwen3-vl qkv / o projections and swiglu linears with checkpoint-",
       "id": "parallel_shard_rationale_367"
     },
@@ -3986,7 +4013,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L24",
-      "community": 58,
+      "community": 59,
       "norm_label": "the caller aborted the running generation.",
       "id": "pipeline_h3_rationale_24"
     },
@@ -3995,7 +4022,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L513",
-      "community": 59,
+      "community": 60,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_513"
     },
@@ -4004,7 +4031,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L506",
-      "community": 60,
+      "community": 61,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_506"
     },
@@ -4013,7 +4040,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L117",
-      "community": 61,
+      "community": 62,
       "norm_label": "sequence-parallel attention. q/k/v are [b, h, s, d] and replicated.",
       "id": "parallel_shard_rationale_117"
     },
@@ -4022,7 +4049,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L303",
-      "community": 62,
+      "community": 63,
       "norm_label": "column-slice a stacked [q; k; v] matrix so each rank owns the same heads of all",
       "id": "parallel_shard_rationale_303"
     },
@@ -4031,7 +4058,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L319",
-      "community": 63,
+      "community": 64,
       "norm_label": "column-slice a swiglu gate||up matrix so each rank owns matching rows of both ha",
       "id": "parallel_shard_rationale_319"
     },
@@ -4040,7 +4067,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L361",
-      "community": 64,
+      "community": 65,
       "norm_label": "replace dit qkv / out projections and swiglu linears with checkpoint-sliced para",
       "id": "parallel_shard_rationale_361"
     },
@@ -4049,7 +4076,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L482",
-      "community": 65,
+      "community": 66,
       "norm_label": "pack reference latents in prompt order: images, then each soundtrack before its",
       "id": "pipeline_h3_rationale_482"
     },
@@ -4058,7 +4085,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L97",
-      "community": 66,
+      "community": 67,
       "norm_label": "sequence-parallel attention. q/k/v are [b, h, s, d] and replicated.",
       "id": "parallel_shard_rationale_97"
     },
@@ -4067,7 +4094,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/parallel_shard.py",
       "source_location": "L164",
-      "community": 67,
+      "community": 68,
       "norm_label": "exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start",
       "id": "parallel_shard_rationale_164"
     },
@@ -4076,7 +4103,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L23",
-      "community": 68,
+      "community": 69,
       "norm_label": "the caller aborted the running generation.",
       "id": "pipeline_h3_rationale_23"
     },
@@ -4085,7 +4112,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L27",
-      "community": 69,
+      "community": 70,
       "norm_label": "a reference image, video, or audio clip failed validation.",
       "id": "pipeline_h3_rationale_27"
     },
@@ -4094,7 +4121,7 @@
       "file_type": "rationale",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L31",
-      "community": 70,
+      "community": 71,
       "norm_label": "bitexact ffmpeg muxing did not produce an output file.",
       "id": "pipeline_h3_rationale_31"
     }
@@ -4848,7 +4875,19 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
-      "source_location": "L94",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_src": "home_deepak_deepakproj_mmh3_frontend_src_components_generationcontrols_tsx",
+      "_tgt": "generationcontrols_stepsfor",
+      "source": "home_deepak_deepakproj_mmh3_frontend_src_components_generationcontrols_tsx",
+      "target": "generationcontrols_stepsfor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
+      "source_location": "L98",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_frontend_src_components_generationcontrols_tsx",
       "_tgt": "generationcontrols_handlemodechange",
@@ -4860,7 +4899,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/frontend/src/components/GenerationControls.tsx",
-      "source_location": "L491",
+      "source_location": "L490",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_frontend_src_components_generationcontrols_tsx",
       "_tgt": "generationcontrols_if",
@@ -8931,8 +8970,8 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/test_attention_patches.py",
       "source_location": "L20",
       "weight": 1.0,
-      "_src": "test_attention_patches_tiny_h3",
-      "_tgt": "modelpatcher",
+      "_src": "modelpatcher",
+      "_tgt": "test_attention_patches_tiny_h3",
       "source": "modelpatcher",
       "target": "test_attention_patches_tiny_h3"
     },
@@ -10464,7 +10503,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L279",
+      "source_location": "L284",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_unet",
@@ -10476,7 +10515,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L285",
+      "source_location": "L292",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_lora",
@@ -10488,7 +10527,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L291",
+      "source_location": "L298",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_controlnet",
@@ -10500,7 +10539,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L297",
+      "source_location": "L304",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_unload_device",
@@ -10512,7 +10551,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L304",
+      "source_location": "L311",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_unwrap_nn",
@@ -10524,7 +10563,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L313",
+      "source_location": "L320",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_bind_module_device",
@@ -10536,7 +10575,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L335",
+      "source_location": "L342",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_comfy_manages_weights",
@@ -10548,7 +10587,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L341",
+      "source_location": "L348",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_apply_stage_shards",
@@ -10560,7 +10599,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L360",
+      "source_location": "L367",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_tighten_video_vae",
@@ -10572,7 +10611,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L373",
+      "source_location": "L380",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_failure_text",
@@ -10584,7 +10623,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L378",
+      "source_location": "L385",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_cuda_oom",
@@ -10596,7 +10635,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L395",
+      "source_location": "L402",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_count_refs",
@@ -10608,7 +10647,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L400",
+      "source_location": "L407",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_at",
@@ -10620,7 +10659,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L405",
+      "source_location": "L412",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_run_job",
@@ -10632,7 +10671,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L463",
+      "source_location": "L470",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_run_job_inner",
@@ -10644,7 +10683,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L602",
+      "source_location": "L612",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_stage1_condition",
@@ -10656,7 +10695,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L626",
+      "source_location": "L636",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_reference_pack",
@@ -10668,7 +10707,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L658",
+      "source_location": "L668",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_audio_payload",
@@ -10680,7 +10719,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L663",
+      "source_location": "L673",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_apply_controlnet",
@@ -10692,7 +10731,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L701",
+      "source_location": "L711",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_is_fasth3",
@@ -10704,7 +10743,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L707",
+      "source_location": "L717",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_has_control",
@@ -10716,7 +10755,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L711",
+      "source_location": "L721",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_patch_attention",
@@ -10728,7 +10767,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L730",
+      "source_location": "L740",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_stage2_sample",
@@ -10740,7 +10779,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L765",
+      "source_location": "L775",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_hook_progress",
@@ -10752,7 +10791,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L788",
+      "source_location": "L798",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_stage3_decode",
@@ -10764,7 +10803,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L813",
+      "source_location": "L823",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_decode_audio",
@@ -10776,7 +10815,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L820",
+      "source_location": "L830",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_waveform_48k",
@@ -10788,7 +10827,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L838",
+      "source_location": "L848",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_ephemeral_root",
@@ -10800,7 +10839,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L842",
+      "source_location": "L852",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_require_media",
@@ -10812,7 +10851,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L852",
+      "source_location": "L862",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_image",
@@ -10824,7 +10863,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L864",
+      "source_location": "L874",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_resize_image",
@@ -10836,7 +10875,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L883",
+      "source_location": "L893",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_video",
@@ -10848,7 +10887,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L888",
+      "source_location": "L898",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_ffmpeg_threads",
@@ -10860,7 +10899,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L893",
+      "source_location": "L903",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_video_native",
@@ -10872,7 +10911,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L937",
+      "source_location": "L947",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_largest_aligned",
@@ -10884,7 +10923,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L949",
+      "source_location": "L959",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_load_audio_full",
@@ -10896,7 +10935,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L990",
+      "source_location": "L1000",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_ffprobe_size",
@@ -10908,7 +10947,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1025",
+      "source_location": "L1035",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_ffmpeg_raw",
@@ -10920,7 +10959,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1035",
+      "source_location": "L1045",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_mux",
@@ -10932,7 +10971,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1159",
+      "source_location": "L1169",
       "weight": 1.0,
       "_src": "home_deepak_deepakproj_mmh3_inference_worker_pipeline_h3_py",
       "_tgt": "pipeline_h3_secure_unlink",
@@ -10956,7 +10995,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L460",
+      "source_location": "L467",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job",
       "_tgt": "pipeline_h3_jobaborted",
@@ -11088,7 +11127,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L488",
+      "source_location": "L495",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_badreference",
@@ -11100,7 +11139,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L844",
+      "source_location": "L854",
       "weight": 1.0,
       "_src": "pipeline_h3_require_media",
       "_tgt": "pipeline_h3_badreference",
@@ -11112,7 +11151,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L859",
+      "source_location": "L869",
       "weight": 1.0,
       "_src": "pipeline_h3_load_image",
       "_tgt": "pipeline_h3_badreference",
@@ -11124,7 +11163,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L897",
+      "source_location": "L907",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_badreference",
@@ -11136,7 +11175,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L984",
+      "source_location": "L994",
       "weight": 1.0,
       "_src": "pipeline_h3_load_audio_full",
       "_tgt": "pipeline_h3_badreference",
@@ -11148,7 +11187,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1029",
+      "source_location": "L1039",
       "weight": 1.0,
       "_src": "pipeline_h3_ffmpeg_raw",
       "_tgt": "pipeline_h3_badreference",
@@ -11244,7 +11283,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L596",
+      "source_location": "L606",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_muxfailed",
@@ -11256,7 +11295,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1039",
+      "source_location": "L1049",
       "weight": 1.0,
       "_src": "pipeline_h3_mux",
       "_tgt": "pipeline_h3_muxfailed",
@@ -11376,7 +11415,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L444",
+      "source_location": "L451",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job",
       "_tgt": "pipeline_h3_check_host_gate",
@@ -11388,7 +11427,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L586",
+      "source_location": "L596",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_check_host_gate",
@@ -11400,7 +11439,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L900",
+      "source_location": "L910",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_check_host_gate",
@@ -11460,7 +11499,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L554",
+      "source_location": "L564",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_check_vram_gate",
@@ -11532,7 +11571,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L449",
+      "source_location": "L456",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job",
       "_tgt": "pipeline_h3_boot_comfy",
@@ -11580,7 +11619,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L282",
+      "source_location": "L287",
       "weight": 1.0,
       "_src": "pipeline_h3_load_unet",
       "_tgt": "pipeline_h3_rel_model_name",
@@ -11592,7 +11631,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L288",
+      "source_location": "L295",
       "weight": 1.0,
       "_src": "pipeline_h3_load_lora",
       "_tgt": "pipeline_h3_rel_model_name",
@@ -11604,7 +11643,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L294",
+      "source_location": "L301",
       "weight": 1.0,
       "_src": "pipeline_h3_load_controlnet",
       "_tgt": "pipeline_h3_rel_model_name",
@@ -11628,7 +11667,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L480",
+      "source_location": "L487",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_load_vae",
@@ -11640,7 +11679,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L545",
+      "source_location": "L552",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_load_lora",
@@ -11652,7 +11691,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L493",
+      "source_location": "L500",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_unload_device",
@@ -11664,7 +11703,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L806",
+      "source_location": "L816",
       "weight": 1.0,
       "_src": "pipeline_h3_stage3_decode",
       "_tgt": "pipeline_h3_unload_device",
@@ -11676,7 +11715,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L314",
+      "source_location": "L321",
       "weight": 1.0,
       "_src": "pipeline_h3_bind_module_device",
       "_tgt": "pipeline_h3_unwrap_nn",
@@ -11688,7 +11727,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L348",
+      "source_location": "L355",
       "weight": 1.0,
       "_src": "pipeline_h3_apply_stage_shards",
       "_tgt": "pipeline_h3_unwrap_nn",
@@ -11700,7 +11739,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L761",
+      "source_location": "L771",
       "weight": 1.0,
       "_src": "pipeline_h3_stage2_sample",
       "_tgt": "pipeline_h3_unwrap_nn",
@@ -11712,7 +11751,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L797",
+      "source_location": "L807",
       "weight": 1.0,
       "_src": "pipeline_h3_stage3_decode",
       "_tgt": "pipeline_h3_bind_module_device",
@@ -11724,7 +11763,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L342",
+      "source_location": "L349",
       "weight": 1.0,
       "_src": "pipeline_h3_apply_stage_shards",
       "_tgt": "pipeline_h3_comfy_manages_weights",
@@ -11736,7 +11775,19 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L755",
+      "source_location": "L559",
+      "weight": 1.0,
+      "_src": "pipeline_h3_run_job_inner",
+      "_tgt": "pipeline_h3_comfy_manages_weights",
+      "source": "pipeline_h3_comfy_manages_weights",
+      "target": "pipeline_h3_run_job_inner",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L765",
       "weight": 1.0,
       "_src": "pipeline_h3_stage2_sample",
       "_tgt": "pipeline_h3_comfy_manages_weights",
@@ -11748,7 +11799,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L553",
+      "source_location": "L563",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_apply_stage_shards",
@@ -11760,7 +11811,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L796",
+      "source_location": "L806",
       "weight": 1.0,
       "_src": "pipeline_h3_stage3_decode",
       "_tgt": "pipeline_h3_tighten_video_vae",
@@ -11772,7 +11823,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L511",
+      "source_location": "L518",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_failure_text",
@@ -11784,7 +11835,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L510",
+      "source_location": "L517",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_cuda_oom",
@@ -11796,7 +11847,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L755",
+      "source_location": "L765",
       "weight": 1.0,
       "_src": "pipeline_h3_stage2_sample",
       "_tgt": "pipeline_h3_cuda_oom",
@@ -11808,7 +11859,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L430",
+      "source_location": "L437",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job",
       "_tgt": "pipeline_h3_count_refs",
@@ -11820,7 +11871,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L623",
+      "source_location": "L633",
       "weight": 1.0,
       "_src": "pipeline_h3_stage1_condition",
       "_tgt": "pipeline_h3_at",
@@ -11832,7 +11883,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L716",
+      "source_location": "L726",
       "weight": 1.0,
       "_src": "pipeline_h3_patch_attention",
       "_tgt": "pipeline_h3_at",
@@ -11844,7 +11895,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L802",
+      "source_location": "L812",
       "weight": 1.0,
       "_src": "pipeline_h3_stage3_decode",
       "_tgt": "pipeline_h3_at",
@@ -11856,7 +11907,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L816",
+      "source_location": "L826",
       "weight": 1.0,
       "_src": "pipeline_h3_decode_audio",
       "_tgt": "pipeline_h3_at",
@@ -11868,7 +11919,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L454",
+      "source_location": "L461",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job",
       "_tgt": "pipeline_h3_run_job_inner",
@@ -11964,7 +12015,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L556",
+      "source_location": "L566",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_stage2_sample",
@@ -11976,7 +12027,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L587",
+      "source_location": "L597",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_stage3_decode",
@@ -11988,7 +12039,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L594",
+      "source_location": "L604",
       "weight": 1.0,
       "_src": "pipeline_h3_run_job_inner",
       "_tgt": "pipeline_h3_mux",
@@ -12072,7 +12123,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L606",
+      "source_location": "L616",
       "weight": 1.0,
       "_src": "pipeline_h3_stage1_condition",
       "_tgt": "pipeline_h3_reference_pack",
@@ -12084,7 +12135,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L633",
+      "source_location": "L643",
       "weight": 1.0,
       "_src": "pipeline_h3_reference_pack",
       "_tgt": "pipeline_h3_load_image",
@@ -12096,7 +12147,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L639",
+      "source_location": "L649",
       "weight": 1.0,
       "_src": "pipeline_h3_reference_pack",
       "_tgt": "pipeline_h3_load_video_native",
@@ -12108,7 +12159,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L644",
+      "source_location": "L654",
       "weight": 1.0,
       "_src": "pipeline_h3_reference_pack",
       "_tgt": "pipeline_h3_load_audio_full",
@@ -12120,7 +12171,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L648",
+      "source_location": "L658",
       "weight": 1.0,
       "_src": "pipeline_h3_reference_pack",
       "_tgt": "pipeline_h3_audio_payload",
@@ -12132,19 +12183,19 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L627",
+      "source_location": "L637",
       "weight": 1.0,
-      "_src": "pipeline_h3_rationale_627",
+      "_src": "pipeline_h3_rationale_637",
       "_tgt": "pipeline_h3_reference_pack",
       "source": "pipeline_h3_reference_pack",
-      "target": "pipeline_h3_rationale_627",
+      "target": "pipeline_h3_rationale_637",
       "confidence_score": 1.0
     },
     {
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L670",
+      "source_location": "L680",
       "weight": 1.0,
       "_src": "pipeline_h3_apply_controlnet",
       "_tgt": "pipeline_h3_load_video",
@@ -12156,7 +12207,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L672",
+      "source_location": "L682",
       "weight": 1.0,
       "_src": "pipeline_h3_apply_controlnet",
       "_tgt": "pipeline_h3_load_image",
@@ -12168,7 +12219,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L719",
+      "source_location": "L729",
       "weight": 1.0,
       "_src": "pipeline_h3_patch_attention",
       "_tgt": "pipeline_h3_is_fasth3",
@@ -12180,19 +12231,19 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L702",
+      "source_location": "L712",
       "weight": 1.0,
-      "_src": "pipeline_h3_rationale_702",
+      "_src": "pipeline_h3_rationale_712",
       "_tgt": "pipeline_h3_is_fasth3",
       "source": "pipeline_h3_is_fasth3",
-      "target": "pipeline_h3_rationale_702",
+      "target": "pipeline_h3_rationale_712",
       "confidence_score": 1.0
     },
     {
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L721",
+      "source_location": "L731",
       "weight": 1.0,
       "_src": "pipeline_h3_patch_attention",
       "_tgt": "pipeline_h3_has_control",
@@ -12204,12 +12255,12 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L712",
+      "source_location": "L722",
       "weight": 1.0,
-      "_src": "pipeline_h3_rationale_712",
+      "_src": "pipeline_h3_rationale_722",
       "_tgt": "pipeline_h3_patch_attention",
       "source": "pipeline_h3_patch_attention",
-      "target": "pipeline_h3_rationale_712",
+      "target": "pipeline_h3_rationale_722",
       "confidence_score": 1.0
     },
     {
@@ -12240,7 +12291,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L809",
+      "source_location": "L819",
       "weight": 1.0,
       "_src": "pipeline_h3_stage3_decode",
       "_tgt": "pipeline_h3_decode_audio",
@@ -12276,7 +12327,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L817",
+      "source_location": "L827",
       "weight": 1.0,
       "_src": "pipeline_h3_decode_audio",
       "_tgt": "pipeline_h3_waveform_48k",
@@ -12288,7 +12339,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L845",
+      "source_location": "L855",
       "weight": 1.0,
       "_src": "pipeline_h3_require_media",
       "_tgt": "pipeline_h3_ephemeral_root",
@@ -12300,7 +12351,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1037",
+      "source_location": "L1047",
       "weight": 1.0,
       "_src": "pipeline_h3_mux",
       "_tgt": "pipeline_h3_ephemeral_root",
@@ -12312,7 +12363,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L855",
+      "source_location": "L865",
       "weight": 1.0,
       "_src": "pipeline_h3_load_image",
       "_tgt": "pipeline_h3_require_media",
@@ -12324,7 +12375,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L894",
+      "source_location": "L904",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_require_media",
@@ -12336,7 +12387,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L951",
+      "source_location": "L961",
       "weight": 1.0,
       "_src": "pipeline_h3_load_audio_full",
       "_tgt": "pipeline_h3_require_media",
@@ -12348,7 +12399,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L861",
+      "source_location": "L871",
       "weight": 1.0,
       "_src": "pipeline_h3_load_image",
       "_tgt": "pipeline_h3_resize_image",
@@ -12360,7 +12411,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L884",
+      "source_location": "L894",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video",
       "_tgt": "pipeline_h3_load_video_native",
@@ -12372,7 +12423,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L908",
+      "source_location": "L918",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_ffmpeg_threads",
@@ -12384,7 +12435,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1097",
+      "source_location": "L1107",
       "weight": 1.0,
       "_src": "pipeline_h3_mux",
       "_tgt": "pipeline_h3_ffmpeg_threads",
@@ -12396,7 +12447,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L895",
+      "source_location": "L905",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_ffprobe_size",
@@ -12408,7 +12459,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L901",
+      "source_location": "L911",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_ffmpeg_raw",
@@ -12420,7 +12471,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L927",
+      "source_location": "L937",
       "weight": 1.0,
       "_src": "pipeline_h3_load_video_native",
       "_tgt": "pipeline_h3_largest_aligned",
@@ -12432,7 +12483,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L957",
+      "source_location": "L967",
       "weight": 1.0,
       "_src": "pipeline_h3_load_audio_full",
       "_tgt": "pipeline_h3_ffmpeg_raw",
@@ -12444,7 +12495,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L1148",
+      "source_location": "L1158",
       "weight": 1.0,
       "_src": "pipeline_h3_mux",
       "_tgt": "pipeline_h3_secure_unlink",
@@ -12530,21 +12581,9 @@
       "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
       "source_location": "L11",
       "weight": 0.8,
-      "_src": "pipeline_h3_rationale_627",
+      "_src": "pipeline_h3_rationale_637",
       "_tgt": "memory_manager_resourcelimitexceeded",
-      "confidence_score": 0.5,
-      "source": "pipeline_h3_rationale_627",
-      "target": "memory_manager_resourcelimitexceeded"
-    },
-    {
-      "relation": "uses",
-      "confidence": "INFERRED",
-      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
-      "source_location": "L11",
-      "weight": 0.8,
-      "_src": "pipeline_h3_rationale_702",
-      "_tgt": "memory_manager_resourcelimitexceeded",
-      "source": "pipeline_h3_rationale_702",
+      "source": "pipeline_h3_rationale_637",
       "target": "memory_manager_resourcelimitexceeded",
       "confidence_score": 0.5
     },
@@ -12556,7 +12595,19 @@
       "weight": 0.8,
       "_src": "pipeline_h3_rationale_712",
       "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
       "source": "pipeline_h3_rationale_712",
+      "target": "memory_manager_resourcelimitexceeded"
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "_src": "pipeline_h3_rationale_722",
+      "_tgt": "memory_manager_resourcelimitexceeded",
+      "source": "pipeline_h3_rationale_722",
       "target": "memory_manager_resourcelimitexceeded",
       "confidence_score": 0.5
     },
@@ -12871,6 +12922,30 @@
       "source": "memory_manager_resourcelimitexceeded",
       "target": "memory_manager_rationale_35",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "_src": "pipeline_h3_rationale_627",
+      "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
+      "source": "memory_manager_resourcelimitexceeded",
+      "target": "pipeline_h3_rationale_627"
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "/home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py",
+      "source_location": "L11",
+      "weight": 0.8,
+      "_src": "pipeline_h3_rationale_702",
+      "_tgt": "memory_manager_resourcelimitexceeded",
+      "confidence_score": 0.5,
+      "source": "memory_manager_resourcelimitexceeded",
+      "target": "pipeline_h3_rationale_702"
     },
     {
       "relation": "uses",

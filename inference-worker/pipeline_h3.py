@@ -276,10 +276,17 @@ def _load_vae(path, dtype):
     return _force_dtype(VAELoader().load_vae(_rel_model_name(path, "vae"))[0], dtype)
 
 
+# ComfyUI's H3 factor (0.114) asked for 22.3 GiB of activations at 1280x736x362 (~99k tokens) and the job was
+# refused on a 20 GB card, yet Stage 2 peaked at 10.8 GiB there (RTX 4000 Ada, FastH3 + VSA). 0.075 keeps ~30% headroom.
+H3_MEMORY_USAGE_FACTOR = 0.075
+
+
 def _load_unet(path):
     from nodes import UNETLoader
 
-    return UNETLoader().load_unet(_rel_model_name(path, "diffussion"), "default")[0]
+    model = UNETLoader().load_unet(_rel_model_name(path, "diffussion"), "default")[0]
+    model.model.memory_usage_factor = H3_MEMORY_USAGE_FACTOR
+    return model
 
 
 def _load_lora(path, base, strength):
@@ -549,6 +556,9 @@ def _run_job_inner(
         )
     else:
         registry.evict("lora")
+    if _comfy_manages_weights(runner):
+        # A cached patcher keeps the GPU it was loaded for; ComfyUI samples there, so gate that GPU.
+        dit_dev = runner.load_device
     report("stage2_load", 0.27, f"Stage 2: checking activation memory on {dit_dev}")
     _apply_stage_shards(runner, schedule2, report, 0.28, "dit")
     check_vram_gate(runner, positive, latent, dit_dev)

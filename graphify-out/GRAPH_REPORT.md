@@ -1,12 +1,12 @@
 # Graph Report - /home/deepak/DeepakProj/MMH3  (2026-10-21)
 
 ## Corpus Check
-- 28 files · ~63,784 words
+- 28 files · ~65,028 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 455 nodes · 823 edges · 71 communities detected
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 215 edges (avg confidence: 0.69)
+- 458 nodes · 827 edges · 72 communities detected
+- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 217 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -81,11 +81,12 @@
 - [[_COMMUNITY_Community 68|Community 68]]
 - [[_COMMUNITY_Community 69|Community 69]]
 - [[_COMMUNITY_Community 70|Community 70]]
+- [[_COMMUNITY_Community 71|Community 71]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `ResourceLimitExceeded` - 34 edges
-2. `PinnedBlockStreamer` - 22 edges
-3. `_run_job_inner()` - 21 edges
+1. `ResourceLimitExceeded` - 36 edges
+2. `_run_job_inner()` - 22 edges
+3. `PinnedBlockStreamer` - 22 edges
 4. `StageSchedule` - 21 edges
 5. `run()` - 20 edges
 6. `ModelRegistry` - 18 edges
@@ -95,6 +96,8 @@
 10. `build_stage_schedule()` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `known_aspect()` --calls--> `generate_video()`  [INFERRED]
+  /home/deepak/DeepakProj/MMH3/backend-rust/src/math.rs → /home/deepak/DeepakProj/MMH3/backend-rust/src/api.rs
 - `run()` --calls--> `serve()`  [INFERRED]
   /home/deepak/DeepakProj/MMH3/backend-rust/src/main.rs → /home/deepak/DeepakProj/MMH3/inference-worker/worker_daemon.py
 - `Bitexact FFmpeg muxing did not produce an output file.` --uses--> `ResourceLimitExceeded`  [INFERRED]
@@ -103,26 +106,24 @@
   /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py → /home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py
 - `Activation budget ComfyUI must keep free before Qwen3-VL encode.      CLIPLoader` --uses--> `ResourceLimitExceeded`  [INFERRED]
   /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py → /home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py
-- `Pack reference latents in prompt order: images, then each soundtrack before its` --uses--> `ResourceLimitExceeded`  [INFERRED]
-  /home/deepak/DeepakProj/MMH3/inference-worker/pipeline_h3.py → /home/deepak/DeepakProj/MMH3/inference-worker/memory_manager.py
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
-Nodes (49): AppState, AvailableModels, cgroup_available_ram_bytes(), check_system_gates(), classify_gpu_roles(), ControlnetConfig, detect_gpus(), dispatch() (+41 more)
+Nodes (54): AppState, AvailableModels, cgroup_available_ram_bytes(), check_system_gates(), classify_gpu_roles(), ControlnetConfig, detect_gpus(), dispatch() (+46 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
 Nodes (35): build_stage_schedule(), PinnedBlockStreamer, probe_live_gpus(), Real-time pre-stage VRAM probe across all visible CUDA devices 0..N-1.      Comb, Probe all GPUs, elect `lead_device`, compute proportional weights w_i, and decid, Double-buffered CUDA stream micro-block streamer backed by Pinned Host RAM., Install transparent per-block double-buffered streaming hooks for standard `for, Stream blocks in micro-batches of `self.batch_size` with double-buffered prefetc (+27 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.09
-Nodes (44): basename(), _apply_controlnet(), _apply_stage_shards(), _at(), _audio_payload(), BadReference, _bind_module_device(), boot_comfy() (+36 more)
+Cohesion: 0.1
+Nodes (41): basename(), _apply_controlnet(), _at(), _audio_payload(), BadReference, _bind_module_device(), boot_comfy(), check_host_gate() (+33 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.11
-Nodes (24): can_pin_bytes(), describe_plan(), device_scope(), estimate_stage_memory_mb(), GPUStatus, host_ram_info(), _is_mocked(), ModelRegistry (+16 more)
+Cohesion: 0.1
+Nodes (27): can_pin_bytes(), describe_plan(), device_scope(), estimate_stage_memory_mb(), GPUStatus, _is_mocked(), ModelRegistry, pin_tensor() (+19 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.09
@@ -133,43 +134,43 @@ Cohesion: 0.12
 Nodes (22): flush_all(), connect_retry(), GpuInfo, IpcClient, IpcFrame, ProgressEvent, read_frame(), sanitize_code() (+14 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.14
-Nodes (15): router(), sweep_sessions(), bind_addr(), build_tls(), ephemeral_root(), main(), model_root(), run() (+7 more)
+Cohesion: 0.11
+Nodes (27): Exception, Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM., ResourceLimitExceeded, check_vram_gate(), JobAborted, MuxFailed, The caller aborted the running generation., A reference image, video, or audio clip failed validation. (+19 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.13
-Nodes (25): Exception, Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM., ResourceLimitExceeded, check_vram_gate(), JobAborted, MuxFailed, The caller aborted the running generation., A reference image, video, or audio clip failed validation. (+17 more)
+Cohesion: 0.15
+Nodes (22): encode_envelope(), envelope(), handshake(), sealed_error(), session_from_headers(), both_sides_derive_the_same_session_key(), CryptoError, decode_public_key() (+14 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.16
-Nodes (20): encode_envelope(), envelope(), handshake(), sealed_error(), session_from_headers(), both_sides_derive_the_same_session_key(), CryptoError, decode_public_key() (+12 more)
-
-### Community 9 - "Community 9"
 Cohesion: 0.18
 Nodes (8): device(), elect_lead_device(), Elect `lead_device = argmax(usable_vram)` with zero `cuda:0` anchoring., ModelPatcher, ComfyOffloadTests, PatcherSubclass, RecordingRegistry, TinyStack
 
-### Community 10 - "Community 10"
+### Community 9 - "Community 9"
 Cohesion: 0.26
-Nodes (9): _has_control(), _is_fasth3(), _patch_attention(), FastH3 checkpoints are VSA-trained and ship its coarse-attention gates., Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., AttentionPatchTests, block_patches(), Two-block MiniMax H3 DiT; `vsa` adds the to_gate_compress layers FastH3 checkpoi (+1 more)
+Nodes (9): _has_control(), _is_fasth3(), _patch_attention(), Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., AttentionPatchTests, block_patches(), Two-block MiniMax H3 DiT; `vsa` adds the to_gate_compress layers FastH3 checkpoi (+1 more)
+
+### Community 10 - "Community 10"
+Cohesion: 0.36
+Nodes (2): EphemeralStorage, restrict_dir()
 
 ### Community 11 - "Community 11"
-Cohesion: 0.29
-Nodes (3): clip_activation_bytes(), Activation budget ComfyUI must keep free before Qwen3-VL encode.      CLIPLoader, Stage1ClipVramTests
+Cohesion: 0.31
+Nodes (6): aspect_components(), compute_aligned_frame_length(), compute_dimensions(), dimensions_stay_on_grid(), frame_length_is_congruent_five_mod_seventeen(), known_aspect()
 
 ### Community 12 - "Community 12"
 Cohesion: 0.36
 Nodes (2): _make_video(), ReferenceVideoAudioTests
 
 ### Community 13 - "Community 13"
+Cohesion: 0.29
+Nodes (3): clip_activation_bytes(), Activation budget ComfyUI must keep free before Qwen3-VL encode.      CLIPLoader, Stage1ClipVramTests
+
+### Community 14 - "Community 14"
 Cohesion: 0.5
 Nodes (0): 
 
-### Community 14 - "Community 14"
-Cohesion: 0.67
-Nodes (0): 
-
 ### Community 15 - "Community 15"
-Cohesion: 1.0
+Cohesion: 0.5
 Nodes (0): 
 
 ### Community 16 - "Community 16"
@@ -194,79 +195,79 @@ Nodes (0):
 
 ### Community 21 - "Community 21"
 Cohesion: 1.0
-Nodes (1): Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.
+Nodes (0): 
 
 ### Community 22 - "Community 22"
 Cohesion: 1.0
-Nodes (1): (available, limit) inside a cgroup-v2 memory limit, or None when unlimited.
+Nodes (1): Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.
 
 ### Community 23 - "Community 23"
 Cohesion: 1.0
-Nodes (1): Return (available_bytes, total_bytes), honouring the container memory limit.
+Nodes (1): (available, limit) inside a cgroup-v2 memory limit, or None when unlimited.
 
 ### Community 24 - "Community 24"
 Cohesion: 1.0
-Nodes (1): Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.
+Nodes (1): Return (available_bytes, total_bytes), honouring the container memory limit.
 
 ### Community 25 - "Community 25"
 Cohesion: 1.0
-Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
+Nodes (1): Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.
 
 ### Community 26 - "Community 26"
 Cohesion: 1.0
-Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
+Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
 
 ### Community 27 - "Community 27"
 Cohesion: 1.0
-Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
+Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
 
 ### Community 28 - "Community 28"
 Cohesion: 1.0
-Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
+Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
 
 ### Community 29 - "Community 29"
 Cohesion: 1.0
-Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
+Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
 
 ### Community 30 - "Community 30"
 Cohesion: 1.0
-Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
+Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
 
 ### Community 31 - "Community 31"
 Cohesion: 1.0
-Nodes (1): Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.
+Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
 
 ### Community 32 - "Community 32"
 Cohesion: 1.0
-Nodes (1): (available, limit) inside a cgroup-v2 memory limit, or None when unlimited.
+Nodes (1): Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.
 
 ### Community 33 - "Community 33"
 Cohesion: 1.0
-Nodes (1): Return (available_bytes, total_bytes), honouring the container memory limit.
+Nodes (1): (available, limit) inside a cgroup-v2 memory limit, or None when unlimited.
 
 ### Community 34 - "Community 34"
 Cohesion: 1.0
-Nodes (1): Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.
+Nodes (1): Return (available_bytes, total_bytes), honouring the container memory limit.
 
 ### Community 35 - "Community 35"
 Cohesion: 1.0
-Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
+Nodes (1): Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.
 
 ### Community 36 - "Community 36"
 Cohesion: 1.0
-Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
+Nodes (1): [(torch_index, free_bytes, total_bytes)] for every visible CUDA device.
 
 ### Community 37 - "Community 37"
 Cohesion: 1.0
-Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
+Nodes (1): One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one
 
 ### Community 38 - "Community 38"
 Cohesion: 1.0
-Nodes (1): Return the rank-0 error string when any rank failed. Collective when N>1.
+Nodes (1): Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.
 
 ### Community 39 - "Community 39"
 Cohesion: 1.0
-Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
+Nodes (1): Return the rank-0 error string when any rank failed. Collective when N>1.
 
 ### Community 40 - "Community 40"
 Cohesion: 1.0
@@ -274,79 +275,79 @@ Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau =
 
 ### Community 41 - "Community 41"
 Cohesion: 1.0
-Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
+Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
 
 ### Community 42 - "Community 42"
 Cohesion: 1.0
-Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
+Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
 
 ### Community 43 - "Community 43"
 Cohesion: 1.0
-Nodes (1): Replace DiT and Qwen3-VL QKV / O projections and SwiGLU/FFN linears with checkpo
+Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
 
 ### Community 44 - "Community 44"
 Cohesion: 1.0
-Nodes (1): ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl
+Nodes (1): Replace DiT and Qwen3-VL QKV / O projections and SwiGLU/FFN linears with checkpo
 
 ### Community 45 - "Community 45"
 Cohesion: 1.0
-Nodes (1): Verify host RAM, GPU VRAM, and /app/ephemeral tmpfs headroom before allocating.
+Nodes (1): ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl
 
 ### Community 46 - "Community 46"
 Cohesion: 1.0
-Nodes (1): ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl
+Nodes (1): Verify host RAM, GPU VRAM, and /app/ephemeral tmpfs headroom before allocating.
 
 ### Community 47 - "Community 47"
 Cohesion: 1.0
-Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
+Nodes (1): ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl
 
 ### Community 48 - "Community 48"
 Cohesion: 1.0
-Nodes (1): Full checkpoint resident in pinned host RAM, moved stage by stage.
+Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
 
 ### Community 49 - "Community 49"
 Cohesion: 1.0
-Nodes (1): Return (available_bytes, total_bytes) from /proc/meminfo with safe fallback.
+Nodes (1): Full checkpoint resident in pinned host RAM, moved stage by stage.
 
 ### Community 50 - "Community 50"
 Cohesion: 1.0
-Nodes (1): ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned.
+Nodes (1): Return (available_bytes, total_bytes) from /proc/meminfo with safe fallback.
 
 ### Community 51 - "Community 51"
 Cohesion: 1.0
-Nodes (1): ComfyUI-style usable VRAM budget for model weights on `device`.
+Nodes (1): ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned.
 
 ### Community 52 - "Community 52"
 Cohesion: 1.0
-Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
+Nodes (1): ComfyUI-style usable VRAM budget for model weights on `device`.
 
 ### Community 53 - "Community 53"
 Cohesion: 1.0
-Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
+Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
 
 ### Community 54 - "Community 54"
 Cohesion: 1.0
-Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
+Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
 
 ### Community 55 - "Community 55"
 Cohesion: 1.0
-Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
+Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
 
 ### Community 56 - "Community 56"
 Cohesion: 1.0
-Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
+Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
 
 ### Community 57 - "Community 57"
 Cohesion: 1.0
-Nodes (1): Replace DiT and Qwen3-VL QKV / O projections and SwiGLU linears with checkpoint-
+Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
 
 ### Community 58 - "Community 58"
 Cohesion: 1.0
-Nodes (1): The caller aborted the running generation.
+Nodes (1): Replace DiT and Qwen3-VL QKV / O projections and SwiGLU linears with checkpoint-
 
 ### Community 59 - "Community 59"
 Cohesion: 1.0
-Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
+Nodes (1): The caller aborted the running generation.
 
 ### Community 60 - "Community 60"
 Cohesion: 1.0
@@ -354,174 +355,178 @@ Nodes (1): Pack reference latents in prompt order: images, then each soundtrack 
 
 ### Community 61 - "Community 61"
 Cohesion: 1.0
-Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
+Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
 
 ### Community 62 - "Community 62"
 Cohesion: 1.0
-Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
+Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
 
 ### Community 63 - "Community 63"
 Cohesion: 1.0
-Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
+Nodes (1): Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all
 
 ### Community 64 - "Community 64"
 Cohesion: 1.0
-Nodes (1): Replace DiT qkv / out projections and SwiGLU linears with checkpoint-sliced para
+Nodes (1): Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha
 
 ### Community 65 - "Community 65"
 Cohesion: 1.0
-Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
+Nodes (1): Replace DiT qkv / out projections and SwiGLU linears with checkpoint-sliced para
 
 ### Community 66 - "Community 66"
 Cohesion: 1.0
-Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
+Nodes (1): Pack reference latents in prompt order: images, then each soundtrack before its
 
 ### Community 67 - "Community 67"
 Cohesion: 1.0
-Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
+Nodes (1): Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.
 
 ### Community 68 - "Community 68"
 Cohesion: 1.0
-Nodes (1): The caller aborted the running generation.
+Nodes (1): Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start
 
 ### Community 69 - "Community 69"
 Cohesion: 1.0
-Nodes (1): A reference image, video, or audio clip failed validation.
+Nodes (1): The caller aborted the running generation.
 
 ### Community 70 - "Community 70"
+Cohesion: 1.0
+Nodes (1): A reference image, video, or audio clip failed validation.
+
+### Community 71 - "Community 71"
 Cohesion: 1.0
 Nodes (1): Bitexact FFmpeg muxing did not produce an output file.
 
 ## Knowledge Gaps
-- **98 isolated node(s):** `GpuInfo`, `ProgressEvent`, `IpcFrame`, `CryptoError`, `ModelCatalogResponse` (+93 more)
+- **100 isolated node(s):** `GpuInfo`, `ProgressEvent`, `IpcFrame`, `CryptoError`, `ModelCatalogResponse` (+95 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 15`** (2 nodes): `PanicFlushButton.tsx`, `PanicFlushButton()`
+- **Thin community `Community 16`** (2 nodes): `PanicFlushButton.tsx`, `PanicFlushButton()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 16`** (1 nodes): `tailwind.config.js`
+- **Thin community `Community 17`** (1 nodes): `tailwind.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 17`** (1 nodes): `postcss.config.js`
+- **Thin community `Community 18`** (1 nodes): `postcss.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 18`** (1 nodes): `vite.config.ts`
+- **Thin community `Community 19`** (1 nodes): `vite.config.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 19`** (1 nodes): `main.tsx`
+- **Thin community `Community 20`** (1 nodes): `main.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 20`** (1 nodes): `vite-env.d.ts`
+- **Thin community `Community 21`** (1 nodes): `vite-env.d.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 21`** (1 nodes): `Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.`
+- **Thin community `Community 22`** (1 nodes): `Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 22`** (1 nodes): `(available, limit) inside a cgroup-v2 memory limit, or None when unlimited.`
+- **Thin community `Community 23`** (1 nodes): `(available, limit) inside a cgroup-v2 memory limit, or None when unlimited.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 23`** (1 nodes): `Return (available_bytes, total_bytes), honouring the container memory limit.`
+- **Thin community `Community 24`** (1 nodes): `Return (available_bytes, total_bytes), honouring the container memory limit.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 24`** (1 nodes): `Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.`
+- **Thin community `Community 25`** (1 nodes): `Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 25`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
+- **Thin community `Community 26`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 26`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
+- **Thin community `Community 27`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 27`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
+- **Thin community `Community 28`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 28`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
+- **Thin community `Community 29`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 29`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
+- **Thin community `Community 30`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 30`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
+- **Thin community `Community 31`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 31`** (1 nodes): `Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.`
+- **Thin community `Community 32`** (1 nodes): `Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 32`** (1 nodes): `(available, limit) inside a cgroup-v2 memory limit, or None when unlimited.`
+- **Thin community `Community 33`** (1 nodes): `(available, limit) inside a cgroup-v2 memory limit, or None when unlimited.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 33`** (1 nodes): `Return (available_bytes, total_bytes), honouring the container memory limit.`
+- **Thin community `Community 34`** (1 nodes): `Return (available_bytes, total_bytes), honouring the container memory limit.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 34`** (1 nodes): `Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.`
+- **Thin community `Community 35`** (1 nodes): `Physical index -> (free_bytes, total_bytes) without creating CUDA contexts.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 35`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
+- **Thin community `Community 36`** (1 nodes): `[(torch_index, free_bytes, total_bytes)] for every visible CUDA device.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 36`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
+- **Thin community `Community 37`** (1 nodes): `One model per GPU: DiT on the emptiest card, text encoder + VAEs on the next one`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
+- **Thin community `Community 38`** (1 nodes): `Caches one ComfyUI model object per slot; ComfyUI itself manages VRAM residency.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 38`** (1 nodes): `Return the rank-0 error string when any rank failed. Collective when N>1.`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 39`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
+- **Thin community `Community 39`** (1 nodes): `Return the rank-0 error string when any rank failed. Collective when N>1.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 40`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 41`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
+- **Thin community `Community 41`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
+- **Thin community `Community 42`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (1 nodes): `Replace DiT and Qwen3-VL QKV / O projections and SwiGLU/FFN linears with checkpo`
+- **Thin community `Community 43`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 44`** (1 nodes): `ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl`
+- **Thin community `Community 44`** (1 nodes): `Replace DiT and Qwen3-VL QKV / O projections and SwiGLU/FFN linears with checkpo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (1 nodes): `Verify host RAM, GPU VRAM, and /app/ephemeral tmpfs headroom before allocating.`
+- **Thin community `Community 45`** (1 nodes): `ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (1 nodes): `ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl`
+- **Thin community `Community 46`** (1 nodes): `Verify host RAM, GPU VRAM, and /app/ephemeral tmpfs headroom before allocating.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
+- **Thin community `Community 47`** (1 nodes): `ComfyUI model object moved with the 3-stage pinned-RAM registry and ComfyUI-styl`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 48`** (1 nodes): `Full checkpoint resident in pinned host RAM, moved stage by stage.`
+- **Thin community `Community 48`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (1 nodes): `Return (available_bytes, total_bytes) from /proc/meminfo with safe fallback.`
+- **Thin community `Community 49`** (1 nodes): `Full checkpoint resident in pinned host RAM, moved stage by stage.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (1 nodes): `ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned.`
+- **Thin community `Community 50`** (1 nodes): `Return (available_bytes, total_bytes) from /proc/meminfo with safe fallback.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 51`** (1 nodes): `ComfyUI-style usable VRAM budget for model weights on `device`.`
+- **Thin community `Community 51`** (1 nodes): `ComfyUI-style pin budget guard: keep >= max(8 GB, 12% of RAM) headroom unpinned.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 52`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
+- **Thin community `Community 52`** (1 nodes): `ComfyUI-style usable VRAM budget for model weights on `device`.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 53`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
+- **Thin community `Community 53`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 54`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
+- **Thin community `Community 54`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
+- **Thin community `Community 55`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 56`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
+- **Thin community `Community 56`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (1 nodes): `Replace DiT and Qwen3-VL QKV / O projections and SwiGLU linears with checkpoint-`
+- **Thin community `Community 57`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 58`** (1 nodes): `The caller aborted the running generation.`
+- **Thin community `Community 58`** (1 nodes): `Replace DiT and Qwen3-VL QKV / O projections and SwiGLU linears with checkpoint-`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 59`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
+- **Thin community `Community 59`** (1 nodes): `The caller aborted the running generation.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 60`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
+- **Thin community `Community 61`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 62`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
+- **Thin community `Community 62`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
+- **Thin community `Community 63`** (1 nodes): `Column-slice a stacked [Q; K; V] matrix so each rank owns the same heads of all`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (1 nodes): `Replace DiT qkv / out projections and SwiGLU linears with checkpoint-sliced para`
+- **Thin community `Community 64`** (1 nodes): `Column-slice a SwiGLU gate||up matrix so each rank owns matching rows of both ha`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
+- **Thin community `Community 65`** (1 nodes): `Replace DiT qkv / out projections and SwiGLU linears with checkpoint-sliced para`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
+- **Thin community `Community 66`** (1 nodes): `Pack reference latents in prompt order: images, then each soundtrack before its`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
+- **Thin community `Community 67`** (1 nodes): `Sequence-parallel attention. q/k/v are [B, H, S, D] and replicated.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (1 nodes): `The caller aborted the running generation.`
+- **Thin community `Community 68`** (1 nodes): `Exact sink rows/keys, block-sparse body past 12288 tokens.      tau = 1.3, start`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (1 nodes): `A reference image, video, or audio clip failed validation.`
+- **Thin community `Community 69`** (1 nodes): `The caller aborted the running generation.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (1 nodes): `Bitexact FFmpeg muxing did not produce an output file.`
+- **Thin community `Community 70`** (1 nodes): `A reference image, video, or audio clip failed validation.`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 71`** (1 nodes): `Bitexact FFmpeg muxing did not produce an output file.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `run()` connect `Community 6` to `Community 0`, `Community 2`, `Community 12`, `Community 5`?**
-  _High betweenness centrality (0.136) - this node is a cross-community bridge._
-- **Why does `open()` connect `Community 8` to `Community 0`, `Community 2`, `Community 3`, `Community 5`, `Community 6`?**
-  _High betweenness centrality (0.092) - this node is a cross-community bridge._
-- **Why does `_mux()` connect `Community 2` to `Community 3`, `Community 4`, `Community 7`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
-- **Are the 30 inferred relationships involving `ResourceLimitExceeded` (e.g. with `Runs generate and flush commands strictly one at a time.` and `JobAborted`) actually correct?**
-  _`ResourceLimitExceeded` has 30 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 14 inferred relationships involving `PinnedBlockStreamer` (e.g. with `ParallelContext` and `ColumnParallelLinear`) actually correct?**
-  _`PinnedBlockStreamer` has 14 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `run()` connect `Community 0` to `Community 2`, `Community 3`, `Community 5`, `Community 10`, `Community 12`?**
+  _High betweenness centrality (0.135) - this node is a cross-community bridge._
+- **Why does `open()` connect `Community 7` to `Community 0`, `Community 10`, `Community 2`, `Community 5`?**
+  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+- **Why does `ResourceLimitExceeded` connect `Community 6` to `Community 9`, `Community 2`, `Community 3`, `Community 13`?**
+  _High betweenness centrality (0.080) - this node is a cross-community bridge._
+- **Are the 32 inferred relationships involving `ResourceLimitExceeded` (e.g. with `Runs generate and flush commands strictly one at a time.` and `JobAborted`) actually correct?**
+  _`ResourceLimitExceeded` has 32 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `_run_job_inner()` (e.g. with `.trim_all_memory()` and `estimate_stage_memory_mb()`) actually correct?**
   _`_run_job_inner()` has 6 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 14 inferred relationships involving `PinnedBlockStreamer` (e.g. with `ParallelContext` and `ColumnParallelLinear`) actually correct?**
+  _`PinnedBlockStreamer` has 14 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 18 inferred relationships involving `StageSchedule` (e.g. with `ParallelContext` and `ColumnParallelLinear`) actually correct?**
   _`StageSchedule` has 18 INFERRED edges - model-reasoned connections that need verification._
