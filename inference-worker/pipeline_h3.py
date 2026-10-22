@@ -480,9 +480,9 @@ def _run_job_inner(
 ):
     keep = set()
 
-    def load(slot, subdir, name, loader, frac, label, key=None):
+    def load(slot, subdir, name, loader, frac, label, key=None, say=None):
         verb = "Reusing cached" if registry.cached(slot, key or name) else "Loading"
-        report(f"load_{slot}", frac, f"{verb} {label} ({name}) for {registry.plan[slot]}")
+        (say or report)(f"load_{slot}", frac, f"{verb} {label} ({name}) for {registry.plan[slot]}")
         obj = registry.get_or_swap(slot, subdir, name, loader, key=key, keep=keep)
         keep.add(slot)
         checkpoint()
@@ -616,7 +616,7 @@ def _render_segment(
         report("stage1_offload", 0.24, f"Encoders stay resident on {enc_dev}; DiT has {dit_dev} to itself")
     if not registry.cached("diffusion", models["diffusion"]):
         registry.evict("lora")
-    runner = load("diffusion", "diffussion", models["diffusion"], _load_unet, 0.10, "DiT backbone")
+    runner = load("diffusion", "diffussion", models["diffusion"], _load_unet, 0.25, "DiT backbone", say=report)
     if mode == "turbo":
         base = runner
         runner = load(
@@ -624,9 +624,10 @@ def _render_segment(
             "lora",
             models["lora"],
             lambda p: _load_lora(p, base, strength),
-            0.13,
+            0.26,
             "4-step Turbo LoRA",
             key=f"{models['diffusion']}|{models['lora']}|{strength:.4f}",
+            say=report,
         )
     else:
         registry.evict("lora")

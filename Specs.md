@@ -805,6 +805,9 @@ else:
 
 ## 7. (Updated) Frontend UI Components (`frontend/src/components/`)
 
+> **Current layout (supersedes the panel layout below).** A Flow-style page: a slim header (status, GPU state, ⚙ Settings, Flush media), a canvas with the running job's progress and a gallery of this session's clips, and a bottom **composer** (`Composer.tsx`). The composer holds what changes per shot: the I2V / Ref2V switch, frame slots (I2V) or ingredient chips (Ref2V, each chip inserts its `<Picture n>` / `<Video n>` / `<Audio n>` tag; videos use their own soundtrack unless audio is paired), the prompt and its continuation scenes (**+ Extend**, §5.5), aspect ratio, resolution, duration and seed. Models, Normal/Turbo, steps, FPS, reference image size, scheduler, sampler, denoise and ControlNet are in the **Settings** dialog (`GenerationControls.tsx`). Ctrl+Enter generates.
+
+
 Provide the coding agent with the following React/TypeScript blueprint implementing the **Model Selector**, **Normal/Turbo Mode Switcher + Steps Slider**, and **Reset to Defaults Button**:
 
 ```tsx
