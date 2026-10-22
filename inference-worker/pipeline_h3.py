@@ -354,6 +354,12 @@ def release_gpu_memory(registry):
         patcher.offload_device = CPU
         _unwrap_nn(vae).to(CPU)
     _unload_comfy_models()
+    for slot in ("diffusion", "lora"):
+        patcher = registry.loaded_slots[slot]["module"]
+        if patcher is not None and _comfy_manages_weights(patcher):
+            # Sampling loaded the DiT through a patched clone that is gone now, so ComfyUI no longer tracks those
+            # weights. Clones share the model and its backups, so unpatching the cached patcher moves them to RAM.
+            patcher.unpatch_model(device_to=patcher.offload_device)
     registry.trim_all_memory()
 
 

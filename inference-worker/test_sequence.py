@@ -74,7 +74,8 @@ class ReleaseTests(unittest.TestCase):
         vae = type("Vae", (), {})()
         vae.patcher, vae.first_stage_model = patcher, torch.nn.Linear(2, 2)
         registry = FakeRegistry()
-        registry.loaded_slots = {"video_vae": {"module": vae}, "audio_vae": {"module": None}}
+        registry.loaded_slots = {slot: {"module": None} for slot in ("audio_vae", "diffusion", "lora")}
+        registry.loaded_slots["video_vae"] = {"module": vae}
         with mock.patch.object(registry, "trim_all_memory") as trimmed:
             p.release_gpu_memory(registry)
         self.assertEqual(patcher.offload_device, p.CPU)
