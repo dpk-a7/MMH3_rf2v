@@ -198,7 +198,7 @@ export function GenerationControls({
         </Field>
       </div>
 
-      <div className="bg-zinc-950/70 border border-zinc-800 rounded-lg p-4 space-y-4">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-sm font-medium">Generation Mode</span>
           <div className="inline-flex rounded-lg bg-zinc-900 p-1 border border-zinc-800">
@@ -209,7 +209,7 @@ export function GenerationControls({
                 state.mode === "normal" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              Normal Mode (Default 20 Steps)
+              Normal
             </button>
             <button
               type="button"
@@ -220,7 +220,7 @@ export function GenerationControls({
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              ⚡ Turbo LoRA Mode (Default 4 Steps)
+              ⚡ Turbo LoRA (base model only)
             </button>
           </div>
         </div>

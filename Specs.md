@@ -719,12 +719,15 @@ Agents use plain JSON over the same TLS port with `Authorization: Bearer $MMH3_A
 | `POST /api/v1/agent/jobs` | The `generate_video` body (§5.3). Omitted fields take defaults: installed models for the task, 8 steps, 5 s, 0.4 MP 16:9 → `202 {"job_id"}` |
 | `GET /api/v1/agent/jobs/{id}` | `status`, `stage`, `progress`, `detail`, `done`, `ok`, `error` |
 | `GET /api/v1/agent/jobs/{id}/video` | The MP4 (`409 not_ready` until done) |
+| `POST /api/v1/agent/merge` | `{"clips": [{"job_id", "start", "end"}]}` → trimmed clips joined in order, sized to the first → `201 {"job_id"}` |
 
 `mcp/mmh3_mcp.py` wraps these as MCP tools (`list_models`, `generate_video`, `get_job`, `download_video`) over stdio: `MMH3_URL=https://<host>:8443 MMH3_AGENT_TOKEN=… MMH3_INSECURE_TLS=1 uv run mcp/mmh3_mcp.py`. The server's certificate is self-generated; point `MMH3_CA_CERT` at it instead of `MMH3_INSECURE_TLS=1` where possible.
 
-### 5.5. Sequences
+### 5.5. Sequences, extensions and the scene builder
 
 `segments` (up to 5 extra prompts) renders one segment per prompt with the same settings and merges them into one MP4. Each continuation is anchored on the previous segment's last 5 frames and their audio with `MiniMaxH3AddGuide` at frame 0, the multiframe mechanism from ComfyUI's H3 templates; those 5 re-rendered frames and their audio are dropped when merging. For I2V the user's first frame opens the sequence and the last frame closes it. Models stay loaded between segments, and each segment uses `seed + index`.
+
+`continue_from` (a finished job id) extends that clip: the job takes the clip's size, anchors on its last 5 frames and audio the same way, and outputs only the new footage, so the two join seamlessly. The UI's **Scene builder** collects clips into a timeline (reorder, trim in/out at frame steps, play through, ↪ extend a shot in place) and **Export video** calls `merge_clips`: the backend trims each clip, fits it to the first clip's frame and concatenates video and audio with FFmpeg into a new finished job.
 
 ## 6. (Updated) Pinned-RAM Model Registry & Hot-Swapping (`inference-worker/memory_manager.py`)
 

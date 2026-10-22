@@ -47,6 +47,15 @@ class ReferenceVideoAudioTests(unittest.TestCase):
         Image.new("RGB", (896, 1152)).save(path)
         self.assertEqual(p._first_frame_canvas(path, 864 * 480), (576, 736))
 
+    def test_clip_tail_is_the_last_five_frames_and_their_audio(self):
+        for with_audio in (True, False):
+            path = os.path.join(self._dir.name, f"clip_{with_audio}.mp4")
+            _make_video(path, with_audio)
+            frames, audio = p._clip_tail(path)
+            self.assertEqual(tuple(frames.shape), (p.GUIDE_FRAMES, 64, 64, 3))
+            self.assertEqual(tuple(audio.shape), (p.GUIDE_FRAMES * p.AUDIO_PER_FRAME, 2))
+            self.assertEqual(bool(audio.abs().sum() > 0), with_audio)
+
     def test_silent_video_is_accepted_without_audio(self):
         _images, videos, video_audios, _audios = self._pack(with_audio=False)
         self.assertIn("ref_video_0", videos)

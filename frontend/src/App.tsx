@@ -15,6 +15,7 @@ import {
   type ModelLists,
 } from "./components/GenerationControls";
 import { PanicFlushButton } from "./components/PanicFlushButton";
+import { SceneBuilder, type SceneItem } from "./components/SceneBuilder";
 import { computeAlignedFrames, computeSize } from "./math";
 
 // Each task has its own FastH3 checkpoint; switching tabs picks it when it is installed.
@@ -34,6 +35,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 type Clip = { id: string; url: string; prompt: string; meta: string };
+type JobInfo = Omit<Clip, "id" | "url"> & { after?: string };
 
 export function App() {
   const client = useMemo(() => new SecureClient(), []);
@@ -72,7 +74,11 @@ export function App() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
   const activeJob = useRef<string | null>(null);
-  const jobInfo = useRef<Record<string, Omit<Clip, "id" | "url">>>({});
+  const jobInfo = useRef<Record<string, JobInfo>>({});
+  const [scene, setScene] = useState<SceneItem[]>([]);
+  const [view, setView] = useState<"clips" | "scene">("clips");
+  const [continueFrom, setContinueFrom] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const pulled = useRef(new Set<string>());
 
   const pushLog = useCallback((entry: string) => {
@@ -94,6 +100,8 @@ export function App() {
     urls.current.clear();
     pulled.current.clear();
     setClips([]);
+    setScene([]);
+    setContinueFrom(null);
   }, []);
 
   const refreshModels = useCallback(async () => {
@@ -234,8 +242,17 @@ export function App() {
       const copy = new Uint8Array(new ArrayBuffer(file.data.byteLength));
       copy.set(file.data);
       const url = track(URL.createObjectURL(new Blob([copy], { type: "video/mp4" })));
-      const info = jobInfo.current[id] ?? { prompt: "", meta: "" };
+      const { after, ...info } = jobInfo.current[id] ?? { prompt: "", meta: "" };
       setClips((prev) => [{ id, url, ...info }, ...prev]);
+      if (after) {
+        // An extension lands right after the shot it continues; the source joins the scene if it was not in it.
+        setScene((prev) => {
+          const shot = newShot(id);
+          const at = prev.map((item) => item.clipId).lastIndexOf(after);
+          if (at < 0) return [...prev, newShot(after), shot];
+          return [...prev.slice(0, at + 1), shot, ...prev.slice(at + 1)];
+        });
+      }
       setStatus("Playback ready");
     } catch (err) {
       pulled.current.delete(id);
@@ -286,6 +303,40 @@ export function App() {
       return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
     });
     if (kind === "video") onClear("video-audio", index);
+  }
+
+  function newShot(clipId: string): SceneItem {
+    return { key: `${clipId}-${Math.random().toString(36).slice(2, 8)}`, clipId, start: 0, end: 0, duration: 0 };
+  }
+
+  function extendClip(clipId: string) {
+    setContinueFrom(clipId);
+    setPrompt("");
+  }
+
+  async function exportScene() {
+    setExporting(true);
+    setError("");
+    try {
+      const result = await client.call("merge_clips", {
+        clips: scene.map((item) => ({ job_id: item.clipId, start: item.start, end: item.end || item.duration })),
+      });
+      if (!result.ok || typeof result.metadata.job_id !== "string") {
+        setError(result.error || "merge_failed");
+        return;
+      }
+      const seconds = Number(result.metadata.seconds ?? 0);
+      jobInfo.current[result.metadata.job_id] = {
+        prompt: `Scene export · ${scene.length} shots`,
+        meta: `Edited · ${result.metadata.width}×${result.metadata.height} · ${seconds.toFixed(1)}s`,
+      };
+      await pullOutput(result.metadata.job_id);
+      setView("clips");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "merge_failed");
+    } finally {
+      setExporting(false);
+    }
   }
 
   function selectTask(next: Task) {
@@ -360,6 +411,7 @@ export function App() {
         },
         task,
         segments: scenes,
+        continue_from: continueFrom,
         keyframes: task === "i2v" ? { first: keyframes[0].mediaId, last: keyframes[1].mediaId } : {},
         references:
           task === "ref2v"
@@ -383,8 +435,10 @@ export function App() {
       const size = task === "i2v" && keyframes[0].mediaId ? "first-frame aspect" : `${width}×${height}`;
       jobInfo.current[id] = {
         prompt: [prompt, ...scenes].join("  →  "),
-        meta: `${TASK_LABEL[task]} · ${size} · ${settings.durationSec}s${scenes.length ? ` × ${scenes.length + 1} scenes` : ""}`,
+        meta: `${TASK_LABEL[task]}${continueFrom ? " · extension" : ""} · ${continueFrom ? "matches source" : size} · ${settings.durationSec}s${scenes.length ? ` × ${scenes.length + 1} scenes` : ""}`,
+        after: continueFrom ?? undefined,
       };
+      setContinueFrom(null);
       activeJob.current = id;
       setJobId(id);
       setDetail(`Job accepted (${width}×${height} · ${frames} frames)`);
@@ -441,13 +495,27 @@ export function App() {
   }
 
   const pct = Math.round(progress * 100);
+  const extending = clips.find((clip) => clip.id === continueFrom);
+  const tab = (id: "clips" | "scene", label: string) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={view === id}
+      onClick={() => setView(id)}
+      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+        view === id ? "bg-white text-zinc-900" : "text-zinc-300 hover:bg-white/10"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   return (
-    <div className="flex h-screen flex-col overflow-x-hidden bg-[#0b0b0e] text-zinc-100">
-      <header className="flex items-center justify-between gap-3 border-b border-white/5 px-5 py-3">
+    <div className="app-bg flex h-screen flex-col overflow-x-hidden text-zinc-100">
+      <header className="glass-bar flex items-center justify-between gap-3 px-5 py-3">
         <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-base font-semibold tracking-tight">H3 Studio</h1>
-          <p className="hidden truncate text-xs text-zinc-500 sm:block">
+          <p className="hidden truncate text-xs text-zinc-400 sm:block">
             {status}
             {jobId ? ` · ${jobId.slice(0, 8)}` : ""}
           </p>
@@ -465,11 +533,7 @@ export function App() {
               })}
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => settingsDialog.current?.showModal()}
-            className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/5"
-          >
+          <button type="button" onClick={() => settingsDialog.current?.showModal()} className="chip whitespace-nowrap">
             ⚙ Settings
           </button>
           <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
@@ -478,14 +542,21 @@ export function App() {
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl space-y-5 px-4 py-6">
+          <div className="glass inline-flex rounded-full p-1" role="tablist" aria-label="View">
+            {tab("clips", `Clips${clips.length ? ` · ${clips.length}` : ""}`)}
+            {tab("scene", `Scene builder${scene.length ? ` · ${scene.length}` : ""}`)}
+          </div>
           {(busy || (stage && stage !== "done" && !clips.length)) && (
-            <section className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4" aria-live="polite">
+            <section className="glass rounded-3xl p-4" aria-live="polite">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">{busy ? "Generating" : stage}</span>
                 <span className="font-mono text-xs text-zinc-400">{pct}%</span>
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                <div className="h-full bg-white transition-all duration-300" style={{ width: `${pct}%` }} />
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-300 via-white to-teal-200 transition-all duration-300"
+                  style={{ width: `${pct}%` }}
+                />
               </div>
               <p className="mt-2 truncate text-xs text-zinc-400">{detail || stage}</p>
               {activityLog.length > 0 && (
@@ -503,31 +574,55 @@ export function App() {
             </section>
           )}
           {error && (
-            <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+            <p role="alert" className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-200 backdrop-blur">
               {error}
             </p>
           )}
-          {clips.length === 0 && !busy ? (
+          {view === "scene" ? (
+            <SceneBuilder
+              items={scene}
+              setItems={setScene}
+              clips={clips}
+              exporting={exporting}
+              onExport={() => void exportScene()}
+              onExtend={extendClip}
+            />
+          ) : clips.length === 0 && !busy ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
-              <p className="text-2xl font-semibold tracking-tight text-zinc-200">What do you want to make?</p>
-              <p className="mt-2 max-w-md text-sm text-zinc-500">
+              <p className="bg-gradient-to-br from-white to-zinc-400 bg-clip-text text-3xl font-semibold tracking-tight text-transparent">
+                What do you want to make?
+              </p>
+              <p className="mt-3 max-w-md text-sm text-zinc-400">
                 {task === "i2v"
                   ? "Add an optional first and last frame, describe the shot and its sound, then press →."
                   : "Add ingredients (pictures, videos, audio), reference them in the prompt by tag, then press →."}{" "}
-                Use + Extend to continue into more scenes.
+                Use + Extend for more scenes, or build a timeline in Scene builder.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {clips.map((clip) => (
-                <figure key={clip.id} className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60">
+                <figure key={clip.id} className="glass group overflow-hidden rounded-3xl">
                   <video src={clip.url} controls className="max-h-[420px] w-full bg-black" />
-                  <figcaption className="space-y-1 p-3">
+                  <figcaption className="space-y-2 p-3">
                     <p className="line-clamp-2 text-sm text-zinc-200">{clip.prompt || "Untitled"}</p>
-                    <div className="flex items-center justify-between text-[11px] text-zinc-500">
-                      <span>{clip.meta}</span>
-                      <a href={clip.url} download={`h3_${clip.id.slice(0, 8)}.mp4`} className="text-zinc-300 hover:text-white">
-                        Download
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+                      <span className="mr-auto">{clip.meta}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScene((prev) => [...prev, newShot(clip.id)]);
+                          setView("scene");
+                        }}
+                        className="chip"
+                      >
+                        ＋ Scene
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => extendClip(clip.id)} className="chip" title="Generate what happens next, starting from this clip's last frames">
+                        ↪ Extend
+                      </button>
+                      <a href={clip.url} download={`h3_${clip.id.slice(0, 8)}.mp4`} className="chip">
+                        ↓
                       </a>
                     </div>
                   </figcaption>
@@ -558,6 +653,8 @@ export function App() {
             setSeedText={setSeedText}
             ready={ready && !flushing}
             busy={busy}
+            extending={continueFrom ? extending?.prompt || "a clip" : null}
+            onCancelExtend={() => setContinueFrom(null)}
             onPick={(kind, index, file) => void onPick(kind, index, file)}
             onClear={onClear}
             onGenerate={() => void generate()}
@@ -570,9 +667,9 @@ export function App() {
         onClick={(event) => {
           if (event.target === event.currentTarget) settingsDialog.current?.close();
         }}
-        className="w-[min(56rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-900 p-0 text-zinc-100 backdrop:bg-black/70"
+        className="glass-strong w-[min(56rem,calc(100vw-2rem))] rounded-3xl p-0 text-zinc-100 backdrop:bg-black/60 backdrop:backdrop-blur-sm"
       >
-        <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <h2 className="text-base font-semibold">Settings</h2>
           <button
             type="button"

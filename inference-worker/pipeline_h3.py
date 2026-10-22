@@ -415,7 +415,10 @@ def run_job(payload, registry, progress, abort_event):
     width = int(payload["width"])
     height = int(payload["height"])
     first_frame = (payload.get("keyframes") or {}).get("first")
-    if payload.get("task") == "i2v" and first_frame:
+    if payload.get("continue_from"):
+        # An extension must match the clip it continues so the two join without a resize.
+        width, height = _ffprobe_size(_require_media(payload["continue_from"])) or (width, height)
+    elif payload.get("task") == "i2v" and first_frame:
         width, height = _first_frame_canvas(first_frame, width * height)
     frames = int(payload["frames"])
     fps = int(payload.get("fps", 24))
@@ -489,7 +492,9 @@ def _run_job_inner(
 
     prompts = [payload.get("prompt") or ""] + [p for p in (payload.get("segments") or []) if p]
     total = len(prompts)
-    video_parts, audio_parts, guide = [], [], None
+    video_parts, audio_parts = [], []
+    # Extending a finished clip starts from its tail exactly like a sequence continuation.
+    guide = _clip_tail(payload["continue_from"]) if payload.get("continue_from") else None
     for index, prompt in enumerate(prompts):
         def seg_report(stage, frac, detail, index=index):
             if total == 1:
@@ -528,10 +533,35 @@ AUDIO_PER_FRAME = 48000 // 24
 
 
 def _segment_keyframes(payload, index, total):
-    """User I2V keyframes: the first frame opens the sequence, the last frame closes it."""
+    """User I2V keyframes: the first frame opens the sequence (unless it extends a clip), the last frame closes it."""
     keyframes = payload.get("keyframes") or {}
-    return {"first": keyframes.get("first") if index == 0 else None,
+    opens = index == 0 and not payload.get("continue_from")
+    return {"first": keyframes.get("first") if opens else None,
             "last": keyframes.get("last") if index == total - 1 else None}
+
+
+def _clip_tail(path):
+    """Last GUIDE_FRAMES frames ([5, H, W, 3] in 0..1) and their 48 kHz stereo audio of a finished clip."""
+    real = _require_media(path)
+    size = _ffprobe_size(real)
+    if size is None:
+        raise BadReference()
+    width, height = size
+    head = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-sseof", "-1", "-i", real]
+    raw = _ffmpeg_raw(head + ["-an", "-vf", "fps=24", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"])
+    frame_bytes = width * height * 3
+    count = len(raw) // frame_bytes
+    if count < GUIDE_FRAMES:
+        raise BadReference()
+    tail = bytearray(raw[(count - GUIDE_FRAMES) * frame_bytes:count * frame_bytes])
+    frames = torch.frombuffer(tail, dtype=torch.uint8).reshape(GUIDE_FRAMES, height, width, 3).float().div_(255.0)
+    try:
+        pcm = _ffmpeg_raw(head + ["-vn", "-f", "f32le", "-ac", "2", "-ar", "48000", "pipe:1"])
+    except BadReference:  # a clip without sound continues from silence
+        pcm = b""
+    usable = len(pcm) - len(pcm) % 8
+    audio = torch.frombuffer(bytearray(pcm[:usable]), dtype=torch.float32).reshape(-1, 2) if usable else torch.zeros(0, 2)
+    return frames, _fit_audio(audio[-GUIDE_FRAMES * AUDIO_PER_FRAME:], GUIDE_FRAMES)
 
 
 def _to_uint8(frames_rgb):

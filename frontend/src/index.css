@@ -10,8 +10,44 @@ body,
 
 body {
   margin: 0;
-  background: #09090b;
+  background: #07070a;
   color: #f4f4f5;
+}
+
+/* Flow-like glass: dark ambient glow behind translucent, blurred panels. */
+.app-bg {
+  background:
+    radial-gradient(55% 45% at 12% -5%, rgba(129, 140, 248, 0.22), transparent 60%),
+    radial-gradient(45% 40% at 92% 8%, rgba(236, 72, 153, 0.13), transparent 60%),
+    radial-gradient(60% 45% at 50% 108%, rgba(45, 212, 191, 0.14), transparent 60%),
+    #07070a;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+
+.glass-strong {
+  background: linear-gradient(180deg, rgba(39, 39, 48, 0.72), rgba(20, 20, 26, 0.72));
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 30px 80px -20px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+
+.glass-bar {
+  background: rgba(7, 7, 10, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.chip {
+  @apply rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs text-zinc-200 transition hover:bg-white/[0.12] disabled:opacity-40;
 }
 
 .pill-select {

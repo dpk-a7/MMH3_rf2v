@@ -65,6 +65,7 @@ async def generate_video(
     megapixels: float = 0.4,
     aspect_ratio: str = "16:9",
     seed: int | None = None,
+    continue_from: str | None = None,
     output_path: str | None = None,
     wait: bool = True,
 ) -> dict:
@@ -74,7 +75,8 @@ async def generate_video(
     <Audio 1> in order; a reference video's own soundtrack is used). "i2v" animates from an optional first_frame
     to an optional last_frame (neither = text-to-video); the output takes the first frame's aspect ratio.
     segments: extra prompts; each continues from the previous segment's last frames and all are merged into
-    one video (up to 5). duration_sec is per segment (1-15). megapixels 0.2-2.0 sets the size
+    one video (up to 5). continue_from: job_id of a finished clip to extend; the new clip starts from its last
+    frames, matches its size and can be joined to it with merge_clips. duration_sec is per segment (1-15). megapixels 0.2-2.0 sets the size
     (0.4 = 864x480 at 16:9). aspect_ratio: 16:9, 9:16, 1:1, 4:3, 3:4 or 21:9.
     With wait=True the call returns after the MP4 is saved to output_path (default ./mmh3_<job>.mp4);
     a 5 s clip takes about 2-5 minutes. With wait=False it returns the job_id for get_job/download_video.
@@ -90,7 +92,7 @@ async def generate_video(
             "last": await _upload(client, last_frame, "image") if last_frame else None,
         }
         body = {"task": task, "prompt": prompt, "duration_sec": duration_sec, "megapixels": megapixels,
-                "aspect_ratio": aspect_ratio, "segments": segments or [], "seed": seed,
+                "aspect_ratio": aspect_ratio, "segments": segments or [], "seed": seed, "continue_from": continue_from,
                 "references": refs, "keyframes": keyframes}
         job_id = (await _json(await client.post("/jobs", json=body)))["job_id"]
         if not wait:
@@ -103,6 +105,17 @@ async def generate_video(
             await asyncio.sleep(5)
         if not job.get("ok"):
             return {"job_id": job_id, "status": job.get("status"), "error": job.get("error") or job.get("detail")}
+    return await download_video(job_id, output_path)
+
+
+@mcp.tool()
+async def merge_clips(clips: list[dict], output_path: str | None = None) -> dict:
+    """Join finished clips into one MP4, in order, each trimmed to [start, end] seconds.
+
+    clips: [{"job_id": "...", "start": 0.0, "end": 5.0}, ...]; sizes are fitted to the first clip.
+    """
+    async with _client() as client:
+        job_id = (await _json(await client.post("/merge", json={"clips": clips})))["job_id"]
     return await download_video(job_id, output_path)
 
 

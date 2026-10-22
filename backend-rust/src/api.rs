@@ -192,6 +192,7 @@ pub fn router(state: AppState, static_dir: PathBuf) -> Router {
         .route("/api/v1/agent/jobs", post(agent_generate))
         .route("/api/v1/agent/jobs/{id}", get(agent_job))
         .route("/api/v1/agent/jobs/{id}/video", get(agent_video))
+        .route("/api/v1/agent/merge", post(agent_merge))
         .with_state(state);
     let spa = tower_http::services::ServeDir::new(static_dir).append_index_html_on_directories(true);
     api.fallback_service(spa)
@@ -301,6 +302,7 @@ async fn dispatch(
         "generate_video" => generate_video(state, &envelope.metadata).await,
         "job_status" => job_status(state, &envelope.metadata).await,
         "download_output" => download_output(state, &envelope.metadata).await,
+        "merge_clips" => merge_clips(state, &envelope.metadata).await,
         "flush_all" => flush_all(state).await,
         _ => Err("unknown_action".into()),
     }
@@ -605,6 +607,9 @@ struct GenerateRequest {
     /// Follow-on prompts: each continues from the previous segment's last frames and all are merged into one MP4.
     #[serde(default)]
     segments: Vec<String>,
+    /// Job id of a finished clip to extend: the new clip starts from its last frames and matches its size.
+    #[serde(default)]
+    continue_from: Option<String>,
     references: ReferenceSet,
 }
 
@@ -804,6 +809,10 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
     };
     let first_frame = keyframe(&req.keyframes.first)?;
     let last_frame = keyframe(&req.keyframes.last)?;
+    let continue_from = match req.continue_from.as_deref().filter(|s| !s.is_empty()) {
+        Some(id) => Value::String(finished_output(state, id)?.to_string_lossy().into_owned()),
+        None => Value::Null,
+    };
     let control_path = if req.controlnet_config.enabled {
         let id = req
             .controlnet_config
@@ -893,6 +902,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         "task": req.task,
         "keyframes": {"first": first_frame, "last": last_frame},
         "segments": req.segments,
+        "continue_from": continue_from,
         "references": {
             "images": images,
             "videos": videos,
@@ -1536,9 +1546,147 @@ fn merge_json(base: &mut Value, over: Value) {
     }
 }
 
+// ---- Clip editing: extend from a finished clip, and merge trimmed clips into one MP4. ----
+
+/// The output file of a finished job, checked to live in the outputs directory.
+fn finished_output(state: &AppState, job_id: &str) -> Result<PathBuf, String> {
+    let uuid = Uuid::parse_str(job_id).map_err(|_| "bad_request".to_string())?;
+    let record = state.jobs.get(&uuid).ok_or_else(|| "not_found".to_string())?;
+    if record.status != JobStatus::Done {
+        return Err("not_ready".into());
+    }
+    let outputs = std::fs::canonicalize(&state.storage.outputs_dir).map_err(|_| "not_found".to_string())?;
+    let path = std::fs::canonicalize(&record.output).map_err(|_| "not_found".to_string())?;
+    if !path.starts_with(&outputs) {
+        return Err("not_found".into());
+    }
+    Ok(path)
+}
+
+#[derive(Deserialize)]
+struct MergeClip {
+    job_id: String,
+    start: f64,
+    end: f64,
+}
+
+#[derive(Deserialize)]
+struct MergeRequest {
+    clips: Vec<MergeClip>,
+}
+
+/// ffmpeg filter graph: trim each input, fit it to the first clip's frame, and concatenate video and audio.
+fn merge_filter(cuts: &[(f64, f64)], width: u32, height: u32) -> String {
+    let mut graph = String::new();
+    for (i, (start, end)) in cuts.iter().enumerate() {
+        graph.push_str(&format!(
+            "[{i}:v]trim=start={start:.3}:end={end:.3},setpts=PTS-STARTPTS,\
+             scale={width}:{height}:force_original_aspect_ratio=decrease,\
+             pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,format=yuv420p[v{i}];\
+             [{i}:a]atrim=start={start:.3}:end={end:.3},asetpts=PTS-STARTPTS,aresample=48000[a{i}];"
+        ));
+    }
+    for i in 0..cuts.len() {
+        graph.push_str(&format!("[v{i}][a{i}]"));
+    }
+    graph.push_str(&format!("concat=n={}:v=1:a=1[v][a]", cuts.len()));
+    graph
+}
+
+async fn probe_size(path: &Path) -> Option<(u32, u32)> {
+    let out = tokio::process::Command::new("ffprobe")
+        .args(["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x"])
+        .arg(path)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .await
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let (w, h) = text.trim().split_once('x')?;
+    Some((w.parse().ok()?, h.parse().ok()?))
+}
+
+async fn merge_clips(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+    let req: MergeRequest = serde_json::from_value(metadata.clone()).map_err(|_| "bad_request".to_string())?;
+    if req.clips.is_empty() || req.clips.len() > 24 {
+        return Err("bad_request".into());
+    }
+    let mut inputs = Vec::new();
+    let mut cuts = Vec::new();
+    for clip in &req.clips {
+        if !(clip.start >= 0.0 && clip.end - clip.start >= 0.1 && clip.end <= 3600.0) {
+            return Err("bad_request".into());
+        }
+        inputs.push(finished_output(state, &clip.job_id)?);
+        cuts.push((clip.start, clip.end));
+    }
+    let total_bytes: u64 = inputs.iter().filter_map(|p| std::fs::metadata(p).ok()).map(|m| m.len()).sum();
+    check_system_gates(&state.storage.root, total_bytes.saturating_mul(2) + 64 * 1024 * 1024, 1024 * 1024 * 1024)?;
+    let (width, height) = probe_size(&inputs[0]).await.ok_or_else(|| "merge_failed".to_string())?;
+    let job_id = Uuid::new_v4();
+    let output = state.storage.outputs_dir.join(format!("{job_id}.mp4"));
+    let mut command = tokio::process::Command::new("ffmpeg");
+    command.args(["-hide_banner", "-loglevel", "error", "-y"]);
+    for input in &inputs {
+        command.arg("-i").arg(input);
+    }
+    command
+        .args(["-filter_complex", &merge_filter(&cuts, width, height)])
+        .args(["-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p"])
+        .args(["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-map_metadata", "-1"])
+        .args(["-fflags", "+bitexact", "-flags", "+bitexact"])
+        .arg(&output)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let ok = command.status().await.map(|s| s.success()).unwrap_or(false);
+    if !ok || !output.is_file() {
+        let _ = fs::remove_file(&output).await;
+        return Err("merge_failed".into());
+    }
+    let seconds: f64 = cuts.iter().map(|(s, e)| e - s).sum();
+    state.jobs.insert(
+        job_id,
+        JobRecord {
+            status: JobStatus::Done,
+            stage: "done".into(),
+            progress: 1.0,
+            detail: format!("Merged {} clips ({seconds:.1}s)", cuts.len()),
+            output,
+            error: None,
+            created: Instant::now(),
+            gpus: Vec::new(),
+        },
+    );
+    Ok(EnvelopeOut {
+        ok: true,
+        action: "merge_clips".into(),
+        metadata: json!({ "job_id": job_id.to_string(), "seconds": seconds, "width": width, "height": height }),
+        files: Vec::new(),
+        error: None,
+    })
+}
+
+async fn agent_merge(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    agent_reply(merge_clips(&state, &body).await, StatusCode::CREATED)
+}
+
 #[cfg(test)]
 mod agent_tests {
     use super::*;
+
+    #[test]
+    fn merge_filter_trims_fits_and_concatenates_every_clip() {
+        let graph = merge_filter(&[(0.0, 5.0), (0.25, 4.5)], 864, 480);
+        assert!(graph.contains("[0:v]trim=start=0.000:end=5.000"));
+        assert!(graph.contains("[1:a]atrim=start=0.250:end=4.500"));
+        assert!(graph.contains("scale=864:480:force_original_aspect_ratio=decrease"));
+        assert!(graph.ends_with("[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]"));
+    }
 
     #[test]
     fn agent_body_overrides_defaults_and_keeps_the_rest() {

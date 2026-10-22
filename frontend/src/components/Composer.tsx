@@ -45,6 +45,8 @@ export function Composer({
   setSeedText,
   ready,
   busy,
+  extending,
+  onCancelExtend,
   onPick,
   onClear,
   onGenerate,
@@ -66,6 +68,8 @@ export function Composer({
   setSeedText: (value: string) => void;
   ready: boolean;
   busy: boolean;
+  extending: string | null;
+  onCancelExtend: () => void;
   onPick: (kind: SlotKind, index: number, file: File) => void;
   onClear: (kind: SlotKind, index: number) => void;
   onGenerate: () => void;
@@ -106,7 +110,7 @@ export function Composer({
       const tag = `<${TAG[kind]} ${order + 1}>`;
       const paired = kind === "video" ? videoAudios[index] : undefined;
       return (
-        <div key={`${kind}-${index}`} className="group relative w-24 shrink-0 rounded-xl border border-white/10 bg-zinc-900">
+        <div key={`${kind}-${index}`} className="group relative w-24 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
           <Preview kind={kind} url={slot.previewUrl} name={slot.name} />
           <button
             type="button"
@@ -133,7 +137,7 @@ export function Composer({
     });
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-zinc-900/90 shadow-2xl shadow-black/50 backdrop-blur">
+    <div className="glass-strong rounded-[28px]">
       <input
         ref={picker}
         type="file"
@@ -146,7 +150,7 @@ export function Composer({
       />
 
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
-        <div className="inline-flex rounded-full bg-zinc-950 p-1" role="tablist" aria-label="Task">
+        <div className="inline-flex rounded-full bg-black/30 p-1 ring-1 ring-inset ring-white/10" role="tablist" aria-label="Task">
           {(
             [
               ["i2v", "I2V", "Frames to video"],
@@ -176,7 +180,7 @@ export function Composer({
           (["First frame", "Last frame"] as const).map((label, index) => {
             const slot = keyframes[index];
             return slot.mediaId ? (
-              <div key={label} className="relative w-28 shrink-0 rounded-xl border border-white/10 bg-zinc-900">
+              <div key={label} className="relative w-28 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
                 <Preview kind="image" url={slot.previewUrl} name={slot.name} />
                 <span className="absolute left-1 top-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] text-zinc-200">{label}</span>
                 <RemoveButton disabled={busy} label={`Remove ${label}`} onClick={() => onClear("keyframe", index)} />
@@ -198,6 +202,15 @@ export function Composer({
       </div>
 
       <div className="px-4 pt-3">
+        {extending && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl bg-indigo-400/10 px-3 py-1.5 text-xs text-indigo-100 ring-1 ring-inset ring-indigo-300/20">
+            <span className="shrink-0">↪ Extending</span>
+            <span className="truncate text-indigo-200/70">{extending}</span>
+            <button type="button" onClick={onCancelExtend} aria-label="Stop extending" className="ml-auto text-indigo-200/70 hover:text-white">
+              ✕
+            </button>
+          </div>
+        )}
         <textarea
           ref={area}
           value={prompt}
@@ -205,11 +218,13 @@ export function Composer({
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && canGenerate) onGenerate();
           }}
-          rows={3}
+          rows={2}
           spellCheck={false}
           aria-label="Prompt"
           placeholder={
-            task === "i2v"
+            extending
+              ? "What happens next? It continues from the clip's last frames and matches its size…"
+              : task === "i2v"
               ? "Describe the shot, the motion and the sound…"
               : "Describe the shot; address ingredients as <Picture 1>, <Video 1>, <Audio 1>…"
           }
@@ -301,7 +316,7 @@ export function Composer({
           type="button"
           disabled={busy || segments.length >= MAX_SCENES - 1}
           onClick={() => setSegments([...segments, ""])}
-          className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5 disabled:text-zinc-600"
+          className="chip disabled:text-zinc-600"
           title="Add a scene that continues from this one's last frames; all scenes are merged into one video"
         >
           + Extend
@@ -316,7 +331,7 @@ export function Composer({
           onClick={onGenerate}
           aria-label={busy ? "Generating" : "Generate"}
           title="Generate (Ctrl+Enter)"
-          className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg font-bold text-zinc-900 transition hover:bg-zinc-200 disabled:bg-zinc-700 disabled:text-zinc-500 sm:ml-0"
+          className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white to-zinc-300 text-lg font-bold text-zinc-900 shadow-lg shadow-indigo-500/20 transition hover:brightness-105 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500 disabled:shadow-none sm:ml-0"
         >
           {busy ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-900" /> : "→"}
         </button>
@@ -355,7 +370,7 @@ function AddTile({ label, hint, disabled, onClick }: { label: string; hint: stri
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-20 w-24 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-white/15 text-xs text-zinc-400 transition hover:border-white/40 hover:text-white disabled:opacity-40"
+      className="flex h-20 w-24 shrink-0 flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-xs text-zinc-400 transition hover:border-white/40 hover:bg-white/[0.07] hover:text-white disabled:opacity-40"
     >
       <span className="text-lg leading-none">+</span>
       <span className="mt-1">{label}</span>
@@ -366,7 +381,7 @@ function AddTile({ label, hint, disabled, onClick }: { label: string; hint: stri
 
 function Pill({ label, children }: { label: string; children: ReactNode }): ReactElement {
   return (
-    <label className="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-950/60 px-3 py-1.5 text-xs text-zinc-400" title={label}>
+    <label className="chip flex items-center gap-1.5 text-zinc-400" title={label}>
       <span className="sr-only">{label}</span>
       {children}
     </label>
