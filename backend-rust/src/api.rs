@@ -592,7 +592,24 @@ struct GenerateRequest {
     seed: Option<u64>,
     #[serde(default)]
     controlnet_config: ControlnetConfig,
+    #[serde(default = "default_task")]
+    task: String,
+    #[serde(default)]
+    keyframes: Keyframes,
     references: ReferenceSet,
+}
+
+fn default_task() -> String {
+    "ref2v".into()
+}
+
+/// I2V keyframes: optional first and last frame image media ids.
+#[derive(Deserialize, Default)]
+struct Keyframes {
+    #[serde(default)]
+    first: Option<String>,
+    #[serde(default)]
+    last: Option<String>,
 }
 
 fn default_lora_strength() -> f32 {
@@ -679,6 +696,9 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
     if req.mode != "normal" && req.mode != "turbo" {
         return Err("bad_request".into());
     }
+    if req.task != "ref2v" && req.task != "i2v" {
+        return Err("bad_request".into());
+    }
     let max_steps = if req.mode == "turbo" { 20 } else { 50 };
     if req.steps < 1 || req.steps > max_steps {
         return Err("bad_request".into());
@@ -760,6 +780,14 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             video_audios.push(Value::Null);
         }
     }
+    let keyframe = |id: &Option<String>| -> Result<Value, String> {
+        match id.as_deref().filter(|s| !s.is_empty()) {
+            Some(id) => Ok(Value::String(resolve_media(state, id, "image")?)),
+            None => Ok(Value::Null),
+        }
+    };
+    let first_frame = keyframe(&req.keyframes.first)?;
+    let last_frame = keyframe(&req.keyframes.last)?;
     let control_path = if req.controlnet_config.enabled {
         let id = req
             .controlnet_config
@@ -845,6 +873,8 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             "end_percent": req.controlnet_config.end_percent,
             "path": control_path,
         },
+        "task": req.task,
+        "keyframes": {"first": first_frame, "last": last_frame},
         "references": {
             "images": images,
             "videos": videos,

@@ -8,10 +8,12 @@ export function PromptTagEditor({
   prompt,
   setPrompt,
   bindInsert,
+  showTags = true,
 }: {
   prompt: string;
   setPrompt: (value: string) => void;
   bindInsert: (insert: (tag: string) => void) => void;
+  showTags?: boolean;
 }): ReactElement {
   const area = useRef<HTMLTextAreaElement>(null);
 
@@ -36,7 +38,7 @@ export function PromptTagEditor({
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight">Prompt</h2>
-        <span className="text-[11px] text-zinc-500">Tags address the reference rack in order</span>
+        {showTags && <span className="text-[11px] text-zinc-500">Tags address the reference rack in order</span>}
       </div>
       <textarea
         ref={area}
@@ -46,7 +48,7 @@ export function PromptTagEditor({
         className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm leading-6 text-zinc-100 resize-y"
         spellCheck={false}
       />
-      <div className="space-y-2">
+      <div className={showTags ? "space-y-2" : "hidden"}>
         <TagRow label="Pictures" tags={PICTURES.map((n) => `<Picture ${n}>`)} onInsert={(tag) => insertFromButton(area.current, prompt, setPrompt, tag)} />
         <TagRow label="Videos" tags={VIDEOS.map((n) => `<Video ${n}>`)} onInsert={(tag) => insertFromButton(area.current, prompt, setPrompt, tag)} />
         <TagRow label="Audios" tags={AUDIOS.map((n) => `<Audio ${n}>`)} onInsert={(tag) => insertFromButton(area.current, prompt, setPrompt, tag)} />

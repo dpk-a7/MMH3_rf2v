@@ -76,6 +76,38 @@ export function ReferenceRack({
   );
 }
 
+export function KeyframeRack({
+  keyframes,
+  busy,
+  onPick,
+  onClear,
+}: {
+  keyframes: SlotState[];
+  busy: boolean;
+  onPick: (index: number, file: File) => void;
+  onClear: (index: number) => void;
+}): ReactElement {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Keyframes</h2>
+        <p className="text-xs text-zinc-500 mt-1">
+          Both optional; with neither it is text-to-video. The output takes the first frame's aspect ratio.
+        </p>
+      </div>
+      <SlotGrid
+        title="Frames"
+        accept="image/*"
+        slots={keyframes}
+        tag={(index) => (index === 0 ? "First frame" : "Last frame")}
+        busy={busy}
+        onPick={onPick}
+        onClear={onClear}
+      />
+    </div>
+  );
+}
+
 function SlotGrid({
   title,
   accept,
@@ -96,7 +128,7 @@ function SlotGrid({
   busy: boolean;
   onPick: (index: number, file: File) => void;
   onClear: (index: number) => void;
-  onInsert: (tag: string) => void;
+  onInsert?: (tag: string) => void;
   paired?: SlotState[];
   onPairedPick?: (index: number, file: File) => void;
   onPairedClear?: (index: number) => void;
@@ -108,13 +140,17 @@ function SlotGrid({
         {slots.map((slot, index) => (
           <div key={`${title}-${index}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-2 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => onInsert(tag(index))}
-                className="text-[11px] font-medium text-sky-300 hover:text-sky-200"
-              >
-                {tag(index)}
-              </button>
+              {onInsert ? (
+                <button
+                  type="button"
+                  onClick={() => onInsert(tag(index))}
+                  className="text-[11px] font-medium text-sky-300 hover:text-sky-200"
+                >
+                  {tag(index)}
+                </button>
+              ) : (
+                <span className="text-[11px] font-medium text-sky-300">{tag(index)}</span>
+              )}
               {slot.mediaId && (
                 <button
                   type="button"

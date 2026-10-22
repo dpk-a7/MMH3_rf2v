@@ -9,16 +9,25 @@ import {
   EMPTY_MODELS,
   FACTORY_DEFAULTS,
   GenerationControls,
+  stepsFor,
   type GenerationState,
   type ModelLists,
 } from "./components/GenerationControls";
 import { PanicFlushButton } from "./components/PanicFlushButton";
 import { PromptTagEditor } from "./components/PromptTagEditor";
-import { ReferenceRack, emptySlots, type SlotState } from "./components/ReferenceRack";
+import { KeyframeRack, ReferenceRack, emptySlots, type SlotState } from "./components/ReferenceRack";
 import { computeAlignedFrames, computeSize } from "./math";
 
 const DEFAULT_PROMPT =
   "Bold comic-book ink style, crisp outlines, dramatic rim light. Use <Picture 1> and <Picture 2> as identity references.";
+
+type Task = "ref2v" | "i2v";
+type SlotKind = "image" | "video" | "audio" | "video-audio" | "keyframe";
+
+const TASKS: { id: Task; label: string; model: RegExp }[] = [
+  { id: "ref2v", label: "Ref2V", model: /omniref/i },
+  { id: "i2v", label: "I2V", model: /fasth3_8step_v2/i },
+];
 
 const ROLE_CLASS: Record<string, string> = {
   active_full: "border-emerald-700 bg-emerald-500/15 text-emerald-300",
@@ -47,6 +56,15 @@ export function App() {
   const [videos, setVideos] = useState<SlotState[]>(() => emptySlots(3));
   const [videoAudios, setVideoAudios] = useState<SlotState[]>(() => emptySlots(3));
   const [audios, setAudios] = useState<SlotState[]>(() => emptySlots(3));
+  const [keyframes, setKeyframes] = useState<SlotState[]>(() => emptySlots(2));
+  const [task, setTask] = useState<Task>("ref2v");
+  const slotSetters: Record<SlotKind, Dispatch<SetStateAction<SlotState[]>>> = {
+    image: setImages,
+    video: setVideos,
+    "video-audio": setVideoAudios,
+    audio: setAudios,
+    keyframe: setKeyframes,
+  };
   const [controlId, setControlId] = useState<string | null>(null);
   const [controlName, setControlName] = useState("");
   const [seedText, setSeedText] = useState("");
@@ -253,17 +271,13 @@ export function App() {
     setter((prev) => prev.map((slot, slotIndex) => (slotIndex === index ? next : slot)));
   }
 
-  async function onPick(kind: "image" | "video" | "audio" | "video-audio", index: number, file: File) {
+  async function onPick(kind: SlotKind, index: number, file: File) {
     setError("");
     try {
-      const uploadKind = kind === "video-audio" ? "audio" : kind;
+      const uploadKind = kind === "video-audio" ? "audio" : kind === "keyframe" ? "image" : kind;
       const mediaId = await uploadSlot(uploadKind, file);
       const previewUrl = track(URL.createObjectURL(file));
-      const next = { mediaId, previewUrl, name: file.name };
-      if (kind === "image") replaceSlot(setImages, index, next);
-      else if (kind === "video") replaceSlot(setVideos, index, next);
-      else if (kind === "video-audio") replaceSlot(setVideoAudios, index, next);
-      else replaceSlot(setAudios, index, next);
+      replaceSlot(slotSetters[kind], index, { mediaId, previewUrl, name: file.name });
     } catch (err) {
       setError(err instanceof Error ? err.message : "upload_failed");
     }
@@ -276,29 +290,19 @@ export function App() {
     }
   }
 
-  function onClear(kind: "image" | "video" | "audio" | "video-audio", index: number) {
+  function onClear(kind: SlotKind, index: number) {
     const blank: SlotState = { mediaId: null, previewUrl: null, name: "" };
-    if (kind === "image") {
-      setImages((prev) => {
-        clearPreview(prev[index]);
-        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
-      });
-    } else if (kind === "video") {
-      setVideos((prev) => {
-        clearPreview(prev[index]);
-        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
-      });
-    } else if (kind === "video-audio") {
-      setVideoAudios((prev) => {
-        clearPreview(prev[index]);
-        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
-      });
-    } else {
-      setAudios((prev) => {
-        clearPreview(prev[index]);
-        return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
-      });
-    }
+    slotSetters[kind]((prev) => {
+      clearPreview(prev[index]);
+      return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
+    });
+  }
+
+  function selectTask(next: Task) {
+    setTask(next);
+    // Each task has its own FastH3 checkpoint; switch to it when it is installed.
+    const model = models.diffussion.find((name) => TASKS.find((t) => t.id === next)?.model.test(name));
+    if (model) setSettings((prev) => ({ ...prev, diffusionModel: model, steps: stepsFor(model, prev.mode) }));
   }
 
   async function onControlFile(file: File | null) {
@@ -363,14 +367,19 @@ export function App() {
           start_percent: settings.controlStart,
           end_percent: settings.controlEnd,
         },
-        references: {
-          images: images.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
-          videos: videos.flatMap((slot) => (slot.mediaId ? [slot.mediaId] : [])),
-          video_audios: videos.flatMap((slot, index) =>
-            slot.mediaId ? [videoAudios[index]?.mediaId ?? null] : [],
-          ),
-          audios: audios.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
-        },
+        task,
+        keyframes: task === "i2v" ? { first: keyframes[0].mediaId, last: keyframes[1].mediaId } : {},
+        references:
+          task === "ref2v"
+            ? {
+                images: images.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
+                videos: videos.flatMap((slot) => (slot.mediaId ? [slot.mediaId] : [])),
+                video_audios: videos.flatMap((slot, index) =>
+                  slot.mediaId ? [videoAudios[index]?.mediaId ?? null] : [],
+                ),
+                audios: audios.map((slot) => slot.mediaId).filter((id): id is string => Boolean(id)),
+              }
+            : {},
       });
       if (!result.ok || typeof result.metadata.job_id !== "string") {
         setBusy(false);
@@ -403,6 +412,7 @@ export function App() {
     setVideos(emptySlots(3));
     setVideoAudios(emptySlots(3));
     setAudios(emptySlots(3));
+    setKeyframes(emptySlots(2));
     setControlId(null);
     setControlName("");
     setJobId(null);
@@ -436,7 +446,7 @@ export function App() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">MiniMax-H3 Ref2VA</h1>
+          <h1 className="text-xl font-semibold tracking-tight">MiniMax-H3 {task === "ref2v" ? "Ref2VA" : "I2VA"}</h1>
           <p className="text-xs text-zinc-500 mt-1">
             {status}
             {jobId ? ` · ${jobId.slice(0, 8)}` : ""}
@@ -464,19 +474,47 @@ export function App() {
         </div>
         <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
       </header>
+      <nav className="px-4 pt-4 flex gap-2" role="tablist" aria-label="Task">
+        {TASKS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={task === t.id}
+            disabled={busy}
+            onClick={() => selectTask(t.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
+              task === t.id
+                ? "bg-blue-600 border-blue-500 text-white"
+                : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white disabled:text-zinc-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
       <main className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_420px] gap-4 p-4">
-        <ReferenceRack
-          images={images}
-          videos={videos}
-          videoAudios={videoAudios}
-          audios={audios}
-          busy={!ready || flushing}
-          onPick={(kind, index, file) => void onPick(kind, index, file)}
-          onClear={onClear}
-          onInsert={(tag) => insertRef.current(tag)}
-        />
+        {task === "ref2v" ? (
+          <ReferenceRack
+            images={images}
+            videos={videos}
+            videoAudios={videoAudios}
+            audios={audios}
+            busy={!ready || flushing}
+            onPick={(kind, index, file) => void onPick(kind, index, file)}
+            onClear={onClear}
+            onInsert={(tag) => insertRef.current(tag)}
+          />
+        ) : (
+          <KeyframeRack
+            keyframes={keyframes}
+            busy={!ready || flushing}
+            onPick={(index, file) => void onPick("keyframe", index, file)}
+            onClear={(index) => onClear("keyframe", index)}
+          />
+        )}
         <section className="space-y-4">
-          <PromptTagEditor prompt={prompt} setPrompt={setPrompt} bindInsert={bindInsert} />
+          <PromptTagEditor prompt={prompt} setPrompt={setPrompt} bindInsert={bindInsert} showTags={task === "ref2v"} />
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <label className="text-xs text-zinc-400">

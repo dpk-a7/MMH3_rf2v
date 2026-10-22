@@ -400,6 +400,8 @@ def _cuda_oom(exc):
 
 
 def _count_refs(payload):
+    if payload.get("task") == "i2v":
+        return sum(1 for path in (payload.get("keyframes") or {}).values() if path)
     refs = payload.get("references") or {}
     return len(refs.get("images") or []) + len(refs.get("videos") or []) + len(refs.get("audios") or [])
 
@@ -425,6 +427,9 @@ def run_job(payload, registry, progress, abort_event):
     mode = payload.get("mode", "normal")
     width = int(payload["width"])
     height = int(payload["height"])
+    first_frame = (payload.get("keyframes") or {}).get("first")
+    if payload.get("task") == "i2v" and first_frame:
+        width, height = _first_frame_canvas(first_frame, width * height)
     frames = int(payload["frames"])
     fps = int(payload.get("fps", 24))
     seed = int(payload.get("seed", 0))
@@ -503,7 +508,10 @@ def _run_job_inner(
 
     def _encode_stage1():
         with device_scope(enc_dev):
-            cond, lat = _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode)
+            if payload.get("task") == "i2v":
+                cond, lat = _stage1_i2v(clip, video_vae, payload, width, height, frames)
+            else:
+                cond, lat = _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode)
             if control is not None:
                 report("stage1_controlnet", 0.22, "Applying ControlNet conditioning")
                 cond = _apply_controlnet(cond, control, video_vae, cn_cfg, frames, height, width)
@@ -564,7 +572,8 @@ def _run_job_inner(
     check_vram_gate(runner, positive, latent, dit_dev)
     with device_scope(dit_dev):
         sampled = _stage2_sample(
-            runner, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry
+            runner, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry,
+            task=payload.get("task", "ref2v"),
         )
     checkpoint()
     if enc_dev == dit_dev:
@@ -607,6 +616,36 @@ def _run_job_inner(
     del frames_rgb, waveform, sampled
     registry.trim_all_memory()
     report("stage3_mux", 1.0, "ready")
+
+
+def _first_frame_canvas(path, area):
+    """I2V stretches the first frame onto the canvas, so keep its aspect at the requested pixel area (32 px grid)."""
+    from PIL import Image
+
+    try:
+        with Image.open(_require_media(path)) as image:
+            w, h = image.size
+    except Exception as exc:
+        raise BadReference() from exc
+    scale = math.sqrt(area / float(w * h))
+    return max(32, round(w * scale / 32) * 32), max(32, round(h * scale / 32) * 32)
+
+
+def _stage1_i2v(clip, video_vae, payload, width, height, frames):
+    """t2va / fl2va: both keyframes optional; the node stretches the first and cover-crops the last."""
+    from comfy_extras.nodes_minimax_h3 import MiniMaxH3ImageToVideo
+
+    keyframes = payload.get("keyframes") or {}
+    frames_in = {
+        f"{key}_frame": _load_image(keyframes[key], width, height, "max").permute(1, 2, 0).unsqueeze(0).contiguous()
+        for key in ("first", "last")
+        if keyframes.get(key)
+    }
+    result = MiniMaxH3ImageToVideo.execute(
+        clip=clip, vae=video_vae, prompt=payload.get("prompt") or "", width=width, height=height, length=frames,
+        **frames_in,
+    )
+    return _at(result, 0), _at(result, 1)
 
 
 def _stage1_condition(clip, video_vae, audio_vae, payload, width, height, frames, ref_mode):
@@ -710,7 +749,10 @@ def _apply_controlnet(positive, control_net, vae, cn_cfg, frames, height, width)
 
 def _is_fasth3(model):
     """FastH3 checkpoints are VSA-trained and ship its coarse-attention gates."""
-    blocks = getattr(model.get_model_object("diffusion_model"), "blocks", None)
+    try:
+        blocks = model.get_model_object("diffusion_model").blocks
+    except AttributeError:
+        return False
     return bool(blocks) and getattr(blocks[0].attn, "to_gate_compress", None) is not None
 
 
@@ -718,26 +760,32 @@ def _has_control(positive):
     return any(len(c) > 1 and isinstance(c[1], dict) and c[1].get("control") is not None for c in positive or ())
 
 
-def _patch_attention(model, positive):
+# ComfyUI's FastH3 templates per task: (video shift, VSA start_percent, sampler).
+# OmniRef (ref2v) runs VSA from the first step with euler; FastH3 V2 (i2v/t2v) shifts 10 and goes sparse after 20%.
+FASTH3_RECIPES = {"ref2v": (12.0, 0.0, "euler"), "i2v": (10.0, 0.2, "res_multistep")}
+
+
+def _patch_attention(model, positive, task="ref2v"):
     """Same model patches as ComfyUI's H3 templates; returns (model, sampler name)."""
     from comfy_extras.nodes_minimax_h3 import MiniMaxH3SigmaShift
     from comfy_extras.nodes_model_advanced import ModelAttentionBackend
 
-    model = _at(MiniMaxH3SigmaShift.execute(model, 12.0, 3.0), 0)
+    fast = _is_fasth3(model)
+    shift, vsa_start, sampler = FASTH3_RECIPES[task] if fast else (12.0, None, "res_multistep")
+    model = _at(MiniMaxH3SigmaShift.execute(model, shift, 3.0), 0)
     # Comfy Kitchen INT8 attention; the node itself falls back to PyTorch attention where the kernel is missing.
     model = _at(ModelAttentionBackend.execute(model, "comfy kitchen attention"), 0)
-    if not _is_fasth3(model):
-        return model, "res_multistep"
-    if not _has_control(positive):
+    if fast and not _has_control(positive):
         from comfy_extras.nodes_sparse_attention import BlockSparseAttention
 
         # FastH3 is trained against VSA at keep 10% and must never run plain block-sparse attention.
         # Skipped under ControlNet: VSA claims every block patch the control injection needs (dense is safe).
-        model = _at(BlockSparseAttention.execute(model, {"selection": "vsa", "keep_percent": 10.0}, 0.0, 1.0), 0)
-    return model, "euler"
+        model = _at(BlockSparseAttention.execute(model, {"selection": "vsa", "keep_percent": 10.0}, vsa_start, 1.0), 0)
+    return model, sampler
 
 
-def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry=None):
+def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry=None,
+                   task="ref2v"):
     from comfy_extras.nodes_custom_sampler import (
         BasicGuider,
         BasicScheduler,
@@ -748,7 +796,7 @@ def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, che
 
     def _once():
         checkpoint()
-        shifted_model, sampler_name = _patch_attention(model, positive)
+        shifted_model, sampler_name = _patch_attention(model, positive, task)
         guider = _at(BasicGuider.execute(shifted_model, positive), 0)
         sampler = _at(KSamplerSelect.execute(sampler_name), 0)
         sigmas = _at(BasicScheduler.execute(shifted_model, scheduler, steps, denoise), 0)

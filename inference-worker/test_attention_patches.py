@@ -37,6 +37,12 @@ class AttentionPatchTests(unittest.TestCase):
         self.assertEqual(sampler, "euler")
         self.assertEqual(block_patches(model), [("double_block", 0), ("double_block", 1)])
 
+    def test_fasth3_i2v_uses_the_v2_recipe(self):
+        model, sampler = pipeline._patch_attention(tiny_h3(vsa=True), [], "i2v")
+        self.assertEqual(sampler, "res_multistep")
+        self.assertEqual(model.model_options["transformer_options"]["minimax_h3_sigma_shift_video"], 10.0)
+        self.assertEqual(block_patches(model), [("double_block", 0), ("double_block", 1)])
+
     def test_fasth3_stays_dense_under_controlnet(self):
         positive = [[torch.zeros(1), {"control": object()}]]
         model, sampler = pipeline._patch_attention(tiny_h3(vsa=True), positive)

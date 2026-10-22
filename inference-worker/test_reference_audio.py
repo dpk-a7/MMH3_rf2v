@@ -40,6 +40,13 @@ class ReferenceVideoAudioTests(unittest.TestCase):
         self.assertIn("ref_video_0", videos)
         self.assertEqual(video_audios["ref_video_audio_0"]["sample_rate"], 48000)
 
+    def test_i2v_canvas_keeps_the_first_frame_aspect(self):
+        from PIL import Image
+
+        path = os.path.join(self._dir.name, "first.png")
+        Image.new("RGB", (896, 1152)).save(path)
+        self.assertEqual(p._first_frame_canvas(path, 864 * 480), (576, 736))
+
     def test_silent_video_is_accepted_without_audio(self):
         _images, videos, video_audios, _audios = self._pack(with_audio=False)
         self.assertIn("ref_video_0", videos)

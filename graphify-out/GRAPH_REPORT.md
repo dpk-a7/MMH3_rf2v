@@ -1,12 +1,12 @@
-# Graph Report - /home/deepak/DeepakProj/MMH3  (2026-10-21)
+# Graph Report - /home/deepak/DeepakProj/MMH3  (2026-10-22)
 
 ## Corpus Check
-- 28 files · ~65,028 words
+- 28 files · ~65,987 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 458 nodes · 827 edges · 72 communities detected
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 217 edges (avg confidence: 0.69)
+- 471 nodes · 853 edges · 72 communities detected
+- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 226 edges (avg confidence: 0.68)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -84,14 +84,14 @@
 - [[_COMMUNITY_Community 71|Community 71]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `ResourceLimitExceeded` - 36 edges
+1. `ResourceLimitExceeded` - 41 edges
 2. `_run_job_inner()` - 22 edges
 3. `PinnedBlockStreamer` - 22 edges
 4. `StageSchedule` - 21 edges
 5. `run()` - 20 edges
 6. `ModelRegistry` - 18 edges
-7. `BadReference` - 16 edges
-8. `run_job()` - 14 edges
+7. `BadReference` - 17 edges
+8. `run_job()` - 15 edges
 9. `generate_video()` - 13 edges
 10. `build_stage_schedule()` - 13 edges
 
@@ -111,43 +111,43 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
-Nodes (54): AppState, AvailableModels, cgroup_available_ram_bytes(), check_system_gates(), classify_gpu_roles(), ControlnetConfig, detect_gpus(), dispatch() (+46 more)
+Nodes (55): AppState, AvailableModels, cgroup_available_ram_bytes(), check_system_gates(), classify_gpu_roles(), ControlnetConfig, detect_gpus(), dispatch() (+47 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
-Nodes (35): build_stage_schedule(), PinnedBlockStreamer, probe_live_gpus(), Real-time pre-stage VRAM probe across all visible CUDA devices 0..N-1.      Comb, Probe all GPUs, elect `lead_device`, compute proportional weights w_i, and decid, Double-buffered CUDA stream micro-block streamer backed by Pinned Host RAM., Install transparent per-block double-buffered streaming hooks for standard `for, Stream blocks in micro-batches of `self.batch_size` with double-buffered prefetc (+27 more)
+Nodes (38): build_stage_schedule(), estimate_stage_memory_mb(), GPUStatus, PinnedBlockStreamer, probe_live_gpus(), Real-time pre-stage VRAM probe across all visible CUDA devices 0..N-1.      Comb, Estimate M_stage = Model Weights + KV/Reference Activation Cache (in MiB)., Probe all GPUs, elect `lead_device`, compute proportional weights w_i, and decid (+30 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.1
-Nodes (41): basename(), _apply_controlnet(), _at(), _audio_payload(), BadReference, _bind_module_device(), boot_comfy(), check_host_gate() (+33 more)
+Cohesion: 0.09
+Nodes (45): basename(), _apply_controlnet(), _at(), _audio_payload(), BadReference, _bind_module_device(), boot_comfy(), check_host_gate() (+37 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.1
-Nodes (27): can_pin_bytes(), describe_plan(), device_scope(), estimate_stage_memory_mb(), GPUStatus, _is_mocked(), ModelRegistry, pin_tensor() (+19 more)
+Nodes (31): open(), can_pin_bytes(), _cgroup_ram(), describe_plan(), device_scope(), host_ram_info(), _is_mocked(), ModelRegistry (+23 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.09
 Nodes (22): flushAll(), generate(), handleProgress(), onControlFile(), onPick(), pullOutput(), replaceSlot(), uploadSlot() (+14 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.12
-Nodes (22): flush_all(), connect_retry(), GpuInfo, IpcClient, IpcFrame, ProgressEvent, read_frame(), sanitize_code() (+14 more)
+Cohesion: 0.1
+Nodes (30): Exception, Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM., ResourceLimitExceeded, check_vram_gate(), JobAborted, MuxFailed, The caller aborted the running generation., A reference image, video, or audio clip failed validation. (+22 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.11
-Nodes (27): Exception, Pre-flight VRAM/RAM/tmpfs safety gate blocked the job before OOM., ResourceLimitExceeded, check_vram_gate(), JobAborted, MuxFailed, The caller aborted the running generation., A reference image, video, or audio clip failed validation. (+19 more)
+Cohesion: 0.12
+Nodes (21): flush_all(), connect_retry(), GpuInfo, IpcClient, IpcFrame, ProgressEvent, read_frame(), sanitize_code() (+13 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.15
-Nodes (22): encode_envelope(), envelope(), handshake(), sealed_error(), session_from_headers(), both_sides_derive_the_same_session_key(), CryptoError, decode_public_key() (+14 more)
+Cohesion: 0.16
+Nodes (8): device(), elect_lead_device(), Elect `lead_device = argmax(usable_vram)` with zero `cuda:0` anchoring., ModelPatcher, ComfyOffloadTests, PatcherSubclass, RecordingRegistry, TinyStack
 
 ### Community 8 - "Community 8"
-Cohesion: 0.18
-Nodes (8): device(), elect_lead_device(), Elect `lead_device = argmax(usable_vram)` with zero `cuda:0` anchoring., ModelPatcher, ComfyOffloadTests, PatcherSubclass, RecordingRegistry, TinyStack
+Cohesion: 0.2
+Nodes (16): encode_envelope(), envelope(), handshake(), sealed_error(), session_from_headers(), both_sides_derive_the_same_session_key(), CryptoError, decode_public_key() (+8 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.26
-Nodes (9): _has_control(), _is_fasth3(), _patch_attention(), Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., AttentionPatchTests, block_patches(), Two-block MiniMax H3 DiT; `vsa` adds the to_gate_compress layers FastH3 checkpoi (+1 more)
+Nodes (9): _has_control(), _is_fasth3(), _patch_attention(), FastH3 checkpoints are VSA-trained and ship its coarse-attention gates., Same model patches as ComfyUI's H3 templates; returns (model, sampler name)., AttentionPatchTests, block_patches(), Two-block MiniMax H3 DiT; `vsa` adds the to_gate_compress layers FastH3 checkpoi (+1 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.36
@@ -158,7 +158,7 @@ Cohesion: 0.31
 Nodes (6): aspect_components(), compute_aligned_frame_length(), compute_dimensions(), dimensions_stay_on_grid(), frame_length_is_congruent_five_mod_seventeen(), known_aspect()
 
 ### Community 12 - "Community 12"
-Cohesion: 0.36
+Cohesion: 0.31
 Nodes (2): _make_video(), ReferenceVideoAudioTests
 
 ### Community 13 - "Community 13"
@@ -398,7 +398,7 @@ Cohesion: 1.0
 Nodes (1): Bitexact FFmpeg muxing did not produce an output file.
 
 ## Knowledge Gaps
-- **100 isolated node(s):** `GpuInfo`, `ProgressEvent`, `IpcFrame`, `CryptoError`, `ModelCatalogResponse` (+95 more)
+- **104 isolated node(s):** `GpuInfo`, `ProgressEvent`, `IpcFrame`, `CryptoError`, `ModelCatalogResponse` (+99 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 16`** (2 nodes): `PanicFlushButton.tsx`, `PanicFlushButton()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -516,14 +516,14 @@ Nodes (1): Bitexact FFmpeg muxing did not produce an output file.
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `run()` connect `Community 0` to `Community 2`, `Community 3`, `Community 5`, `Community 10`, `Community 12`?**
-  _High betweenness centrality (0.135) - this node is a cross-community bridge._
-- **Why does `open()` connect `Community 7` to `Community 0`, `Community 10`, `Community 2`, `Community 5`?**
-  _High betweenness centrality (0.091) - this node is a cross-community bridge._
-- **Why does `ResourceLimitExceeded` connect `Community 6` to `Community 9`, `Community 2`, `Community 3`, `Community 13`?**
-  _High betweenness centrality (0.080) - this node is a cross-community bridge._
-- **Are the 32 inferred relationships involving `ResourceLimitExceeded` (e.g. with `Runs generate and flush commands strictly one at a time.` and `JobAborted`) actually correct?**
-  _`ResourceLimitExceeded` has 32 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `run()` connect `Community 0` to `Community 2`, `Community 3`, `Community 6`, `Community 10`, `Community 12`?**
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
+- **Why does `open()` connect `Community 3` to `Community 0`, `Community 2`, `Community 6`, `Community 8`, `Community 10`?**
+  _High betweenness centrality (0.094) - this node is a cross-community bridge._
+- **Why does `ResourceLimitExceeded` connect `Community 5` to `Community 9`, `Community 2`, `Community 3`, `Community 13`?**
+  _High betweenness centrality (0.092) - this node is a cross-community bridge._
+- **Are the 37 inferred relationships involving `ResourceLimitExceeded` (e.g. with `Runs generate and flush commands strictly one at a time.` and `JobAborted`) actually correct?**
+  _`ResourceLimitExceeded` has 37 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `_run_job_inner()` (e.g. with `.trim_all_memory()` and `estimate_stage_memory_mb()`) actually correct?**
   _`_run_job_inner()` has 6 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 14 inferred relationships involving `PinnedBlockStreamer` (e.g. with `ParallelContext` and `ColumnParallelLinear`) actually correct?**

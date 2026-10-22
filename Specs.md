@@ -142,6 +142,12 @@ $$\text{length} = F_{\text{raw}} + \big(5 - (F_{\text{raw}} \bmod 17)\big) \bmod
 *(Example: $a = 5.0\text{s} \implies F_{\text{raw}} = 120 \implies 120 + (5 - (120 \bmod 17)) \bmod 17 = 120 + 4 = 124\text{ frames}$.)*
 
 
+### 3.2.1. Tasks: Ref2V and I2V
+
+The UI has two tabs. **Ref2V** (default, `task: "ref2v"`) uses the reference rack below with `MiniMaxH3ReferenceToVideo` and the FastH3 OmniRef checkpoint (`fasth3_omniref_8step_pruned_int8_convrot`). **I2V** (`task: "i2v"`) replaces the rack with two optional keyframes (`keyframes.first` / `keyframes.last`, image media ids) and runs `MiniMaxH3ImageToVideo` with FastH3 V2 (`fastvideo_fasth3_8step_v2_pruned_int8_convrot`); with neither keyframe it is text-to-video. The node stretches the first frame onto the canvas, so the worker keeps the first frame's aspect at the requested pixel area (32 px grid), as the ComfyUI template's `ImageScaleToTotalPixels` does; the last frame is cover-cropped. Switching tabs selects that task's checkpoint when it is installed.
+
+FastH3 sampling follows ComfyUI's templates per task: Ref2V uses shift 12/3, VSA from step 0 and `euler`; I2V uses shift 10/3, VSA after 20% (`start_percent` 0.2) and `res_multistep`. Both run 8 steps.
+
 ### 3.3. Multi-Modal Reference Conditioning (Node `136`: `MiniMaxH3ReferenceToVideo`)
 
 
@@ -305,7 +311,7 @@ Clicking **"↺ Reset to Defaults"** restores the exact baseline state defined i
 
 
 
-* **Sampler**: `res_multistep` (`KSamplerSelect`); `euler` for FastH3 checkpoints, matching ComfyUI's FastH3 OmniRef template.
+* **Sampler**: `res_multistep` (`KSamplerSelect`); `euler` for FastH3 in Ref2V, matching ComfyUI's FastH3 OmniRef template (see §3.2.1).
 
 
 * **Scheduler**: `BasicScheduler` with `scheduler` selectable between `"simple"` (default), `"beta"`, or `"normal"` (recommended for heavy multi-reference prompts), `denoise = 1.0`.
