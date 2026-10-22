@@ -708,6 +708,10 @@ fn is_selectable_model_file(name: &str) -> bool {
 
 ---
 
+## 5.3.1. Users, Queue, Flush and System Stats
+
+Every upload and job belongs to the browser session that created it (agent API calls share one owner). Only the owner can reference its media, see its progress over the WebSocket, poll it, download it, extend or merge it. The worker runs one job at a time; further jobs wait in FIFO order (up to 32 queued, 4 per session) and `job_status` reports `queue_position` (1 = next) and `jobs_ahead` (including the running job) while a job waits. **Flush my media** (`flush_all`) aborts only that session's queued/running jobs, zero-wipes only its uploads and outputs, and revokes only its session; other users' jobs and the shared model cache are untouched. `system_stats` returns per-GPU utilisation, VRAM, temperature, power and fan (NVML via `libnvidia-ml.so.1`), CPU percent, core count, load and package temperature, container and host RAM, and running/queued job counts; the UI's **System** panel polls it every 2 s while open.
+
 ## 5.4. Agent API & MCP Server
 
 Agents use plain JSON over the same TLS port with `Authorization: Bearer $MMH3_AGENT_TOKEN`. The routes return 404 unless `MMH3_AGENT_TOKEN` (16+ characters) is set for the container; nothing is logged. They call the same handlers as the encrypted envelope.

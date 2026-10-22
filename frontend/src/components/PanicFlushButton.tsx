@@ -13,9 +13,9 @@ export function PanicFlushButton({
       onClick={onFlush}
       disabled={busy}
       className="whitespace-nowrap rounded-full border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-500/15 disabled:text-red-900"
-      title="Abort jobs, zero-wipe uploads and outputs, flush GPU memory, and revoke local previews"
+      title="Abort your jobs and zero-wipe your uploads and generated videos. Other users are not affected."
     >
-      Flush media
+      Flush my media
     </button>
   );
 }

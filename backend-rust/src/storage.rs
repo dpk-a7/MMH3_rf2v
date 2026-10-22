@@ -96,17 +96,6 @@ impl EphemeralStorage {
             }
         }
     }
-
-    pub async fn flush_all_now(&self) {
-        for dir in [&self.uploads_dir, &self.outputs_dir] {
-            let Ok(mut entries) = fs::read_dir(dir).await else {
-                continue;
-            };
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                Self::secure_remove_file(&entry.path()).await;
-            }
-        }
-    }
 }
 
 async fn restrict_dir(path: &Path) {

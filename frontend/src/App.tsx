@@ -16,6 +16,7 @@ import {
 } from "./components/GenerationControls";
 import { PanicFlushButton } from "./components/PanicFlushButton";
 import { SceneBuilder, type SceneItem } from "./components/SceneBuilder";
+import { SystemMonitor } from "./components/SystemMonitor";
 import { computeAlignedFrames, computeSize } from "./math";
 
 // Each task has its own FastH3 checkpoint; switching tabs picks it when it is installed.
@@ -59,6 +60,9 @@ export function App() {
   const client = useMemo(() => new SecureClient(), []);
   const urls = useRef(new Set<string>());
   const settingsDialog = useRef<HTMLDialogElement>(null);
+  const systemDialog = useRef<HTMLDialogElement>(null);
+  const [systemOpen, setSystemOpen] = useState(false);
+  const [queue, setQueue] = useState<{ position: number; ahead: number } | null>(null);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Securing session");
   const [error, setError] = useState("");
@@ -240,6 +244,9 @@ export function App() {
             ok: Boolean(m.ok),
             gpus: Array.isArray(m.gpus) ? (m.gpus as GpuInfo[]) : undefined,
           };
+          setQueue(
+            typeof m.queue_position === "number" ? { position: m.queue_position, ahead: Number(m.jobs_ahead ?? 0) } : null,
+          );
           handleProgress(ev);
         } catch {
           // Ignore transient polling errors while WebSocket is active
@@ -403,6 +410,7 @@ export function App() {
     setBusy(true);
     jobStart.current = Date.now();
     progressHistory.current = [];
+    setQueue(null);
     setNow(Date.now());
     setProgress(0.01);
     setStage("queued");
@@ -568,6 +576,16 @@ export function App() {
               })}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              systemDialog.current?.showModal();
+              setSystemOpen(true);
+            }}
+            className="chip whitespace-nowrap"
+          >
+            📊 System
+          </button>
           <button type="button" onClick={() => settingsDialog.current?.showModal()} className="chip whitespace-nowrap">
             ⚙ Settings
           </button>
@@ -584,13 +602,16 @@ export function App() {
           {(busy || (stage && stage !== "done" && !clips.length)) && (
             <section className="glass rounded-3xl p-4" aria-live="polite">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{busy ? "Generating" : stage}</span>
+                <span className="font-medium">{busy ? (queue ? "In queue" : "Generating") : stage}</span>
                 <span className="font-mono text-xs text-zinc-300">
                   {pct}%
                   {busy && jobStart.current > 0 && (
                     <>
                       <span className="text-zinc-500"> · </span>⏱ {fmtDuration(now - jobStart.current)}
-                      <span className="text-zinc-500"> · </span>ETA {eta === null ? "estimating…" : `~${fmtDuration(eta)}`}
+                      <span className="text-zinc-500"> · </span>
+                      {queue
+                        ? `#${queue.position} in line · ${queue.ahead} job${queue.ahead === 1 ? "" : "s"} ahead`
+                        : `ETA ${eta === null ? "estimating…" : `~${fmtDuration(eta)}`}`}
                     </>
                   )}
                 </span>
@@ -707,6 +728,30 @@ export function App() {
           />
         </div>
       </div>
+
+      <dialog
+        ref={systemDialog}
+        onClose={() => setSystemOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) systemDialog.current?.close();
+        }}
+        className="glass-strong w-[min(56rem,calc(100vw-2rem))] rounded-3xl p-0 text-zinc-100 backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+      >
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <h2 className="text-base font-semibold">System</h2>
+          <button
+            type="button"
+            onClick={() => systemDialog.current?.close()}
+            aria-label="Close system panel"
+            className="rounded-full px-2 text-zinc-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="max-h-[75vh] overflow-y-auto p-6">
+          <SystemMonitor client={client} open={systemOpen} />
+        </div>
+      </dialog>
 
       <dialog
         ref={settingsDialog}

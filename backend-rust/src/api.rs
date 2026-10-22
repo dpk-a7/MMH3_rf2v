@@ -106,6 +106,8 @@ pub struct SessionRecord {
 }
 
 pub struct MediaRecord {
+    /// Session that uploaded it; only that session can use or flush it.
+    pub owner: Uuid,
     pub path: PathBuf,
     pub kind: String,
     pub created: SystemTime,
@@ -121,6 +123,8 @@ pub enum JobStatus {
 }
 
 pub struct JobRecord {
+    /// Session that queued it; only that session sees its progress, output and queue position.
+    pub owner: Uuid,
     pub status: JobStatus,
     pub stage: String,
     pub progress: f32,
@@ -284,7 +288,7 @@ async fn envelope(State(state): State<AppState>, headers: HeaderMap, body: Bytes
         Err(code) => sealed_error(&key, &action, &code),
     };
     if action == "flush_all" {
-        state.sessions.clear();
+        state.sessions.remove(&session_id);
     }
     let _ = key;
     response
@@ -295,15 +299,16 @@ async fn dispatch(
     session_id: &Uuid,
     mut envelope: EnvelopeIn,
 ) -> Result<EnvelopeOut, String> {
-    let _ = (session_id, &envelope.headers);
+    let _ = &envelope.headers;
     match envelope.action.as_str() {
         "list_models" => Ok(list_models(state).await),
-        "upload_media" => upload_media(state, &envelope.metadata, &mut envelope.files).await,
-        "generate_video" => generate_video(state, &envelope.metadata).await,
-        "job_status" => job_status(state, &envelope.metadata).await,
-        "download_output" => download_output(state, &envelope.metadata).await,
-        "merge_clips" => merge_clips(state, &envelope.metadata).await,
-        "flush_all" => flush_all(state).await,
+        "upload_media" => upload_media(state, *session_id, &envelope.metadata, &mut envelope.files).await,
+        "generate_video" => generate_video(state, *session_id, &envelope.metadata).await,
+        "job_status" => job_status(state, *session_id, &envelope.metadata).await,
+        "download_output" => download_output(state, *session_id, &envelope.metadata).await,
+        "merge_clips" => merge_clips(state, *session_id, &envelope.metadata).await,
+        "flush_all" => flush_mine(state, *session_id).await,
+        "system_stats" => Ok(system_stats(state).await),
         _ => Err("unknown_action".into()),
     }
 }
@@ -391,8 +396,17 @@ const VRAM_SAFETY_RESERVE_MB: u64 = 1536;
 const MIN_USABLE_VRAM_MB: u64 = 3072;
 const TIGHT_VRAM_THRESHOLD_MB: u64 = 8192;
 
+/// The NVIDIA container runtime mounts only `libnvidia-ml.so.1`, not the unversioned name nvml-wrapper looks for.
+fn nvml() -> Option<nvml_wrapper::Nvml> {
+    nvml_wrapper::Nvml::builder()
+        .lib_path(std::ffi::OsStr::new("libnvidia-ml.so.1"))
+        .init()
+        .or_else(|_| nvml_wrapper::Nvml::init())
+        .ok()
+}
+
 pub fn detect_gpus() -> Vec<GpuInfo> {
-    if let Ok(nvml) = nvml_wrapper::Nvml::init() {
+    if let Some(nvml) = nvml() {
         if let Ok(count) = nvml.device_count() {
             let mut gpus = Vec::new();
             for index in 0..count {
@@ -487,6 +501,7 @@ fn fallback_gpus() -> Vec<GpuInfo> {
 
 async fn upload_media(
     state: &AppState,
+    owner: Uuid,
     metadata: &Value,
     files: &mut [EnvelopeFile],
 ) -> Result<EnvelopeOut, String> {
@@ -536,6 +551,7 @@ async fn upload_media(
     state.media.insert(
         id,
         MediaRecord {
+            owner,
             path,
             kind: kind.to_string(),
             created: SystemTime::now(),
@@ -614,6 +630,8 @@ struct GenerateRequest {
 }
 
 const MAX_SEGMENTS: usize = 6;
+const MAX_QUEUED_JOBS: usize = 32;
+const MAX_QUEUED_PER_USER: usize = 4;
 
 fn default_task() -> String {
     "ref2v".into()
@@ -703,7 +721,7 @@ struct ReferenceSet {
     audios: Vec<String>,
 }
 
-async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+async fn generate_video(state: &AppState, owner: Uuid, metadata: &Value) -> Result<EnvelopeOut, String> {
     let req: GenerateRequest =
         serde_json::from_value(metadata.clone()).map_err(|_| "bad_request".to_string())?;
     if req.prompt.trim().is_empty() || req.prompt.len() > 16_000 {
@@ -784,9 +802,9 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         ensure_model_file(&state.model_root, "controlnet", name)?;
     }
 
-    let images = resolve_media_list(state, &req.references.images, "image")?;
-    let videos = resolve_media_list(state, &req.references.videos, "video")?;
-    let audios = resolve_media_list(state, &req.references.audios, "audio")?;
+    let images = resolve_media_list(state, owner, &req.references.images, "image")?;
+    let videos = resolve_media_list(state, owner, &req.references.videos, "video")?;
+    let audios = resolve_media_list(state, owner, &req.references.audios, "audio")?;
     let mut video_audios = Vec::new();
     for (idx, _) in videos.iter().enumerate() {
         let id = req.references.video_audios.get(idx).and_then(|v| v.clone());
@@ -794,7 +812,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             if id.is_empty() {
                 video_audios.push(Value::Null);
             } else {
-                let path = resolve_media(state, &id, "audio")?;
+                let path = resolve_media(state, owner, &id, "audio")?;
                 video_audios.push(Value::String(path));
             }
         } else {
@@ -803,14 +821,14 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
     }
     let keyframe = |id: &Option<String>| -> Result<Value, String> {
         match id.as_deref().filter(|s| !s.is_empty()) {
-            Some(id) => Ok(Value::String(resolve_media(state, id, "image")?)),
+            Some(id) => Ok(Value::String(resolve_media(state, owner, id, "image")?)),
             None => Ok(Value::Null),
         }
     };
     let first_frame = keyframe(&req.keyframes.first)?;
     let last_frame = keyframe(&req.keyframes.last)?;
     let continue_from = match req.continue_from.as_deref().filter(|s| !s.is_empty()) {
-        Some(id) => Value::String(finished_output(state, id)?.to_string_lossy().into_owned()),
+        Some(id) => Value::String(finished_output(state, owner, id)?.to_string_lossy().into_owned()),
         None => Value::Null,
     };
     let control_path = if req.controlnet_config.enabled {
@@ -819,7 +837,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
             .control_media_id
             .clone()
             .ok_or_else(|| "bad_request".to_string())?;
-        Some(resolve_media_any(state, &id, &["image", "video", "control"])?)
+        Some(resolve_media_any(state, owner, &id, &["image", "video", "control"])?)
     } else {
         None
     };
@@ -837,15 +855,12 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         .saturating_mul(1 + req.segments.len() as u64)
         / 16;
     check_system_gates(&state.storage.root, est_output.max(512 * 1024 * 1024), est_ram)?;
-    if state.job_slots.available_permits() == 0 {
-        let active_running = state
-            .jobs
-            .iter()
-            .filter(|entry| matches!(entry.status, JobStatus::Queued | JobStatus::Running))
-            .count();
-        if active_running >= 2 {
-            return Err("server_busy".into());
-        }
+    // The worker runs one job at a time; the rest wait in FIFO order (tokio's semaphore is fair).
+    let waiting = state.jobs.iter().filter(|j| j.status == JobStatus::Queued).count();
+    if waiting >= MAX_QUEUED_JOBS
+        || state.jobs.iter().filter(|j| j.owner == owner && j.status == JobStatus::Queued).count() >= MAX_QUEUED_PER_USER
+    {
+        return Err("server_busy".into());
     }
     let seed = req.seed.unwrap_or_else(random_seed);
     let job_id = Uuid::new_v4();
@@ -853,6 +868,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
     state.jobs.insert(
         job_id,
         JobRecord {
+            owner,
             status: JobStatus::Queued,
             stage: "queued".into(),
             progress: 0.01,
@@ -1065,22 +1081,22 @@ fn ensure_model_file(root: &Path, subdir: &str, name: &str) -> Result<(), String
     }
 }
 
-fn resolve_media_list(state: &AppState, ids: &[String], kind: &str) -> Result<Vec<String>, String> {
+fn resolve_media_list(state: &AppState, owner: Uuid, ids: &[String], kind: &str) -> Result<Vec<String>, String> {
     let mut out = Vec::with_capacity(ids.len());
     for id in ids {
-        out.push(resolve_media(state, id, kind)?);
+        out.push(resolve_media(state, owner, id, kind)?);
     }
     Ok(out)
 }
 
-fn resolve_media(state: &AppState, id: &str, kind: &str) -> Result<String, String> {
-    resolve_media_any(state, id, &[kind])
+fn resolve_media(state: &AppState, owner: Uuid, id: &str, kind: &str) -> Result<String, String> {
+    resolve_media_any(state, owner, id, &[kind])
 }
 
-fn resolve_media_any(state: &AppState, id: &str, kinds: &[&str]) -> Result<String, String> {
+fn resolve_media_any(state: &AppState, owner: Uuid, id: &str, kinds: &[&str]) -> Result<String, String> {
     let uuid = Uuid::parse_str(id).map_err(|_| "bad_media".to_string())?;
     let record = state.media.get(&uuid).ok_or_else(|| "bad_media".to_string())?;
-    if !kinds.iter().any(|kind| record.kind == *kind) {
+    if record.owner != owner || !kinds.iter().any(|kind| record.kind == *kind) {
         return Err("bad_media".into());
     }
     let root = std::fs::canonicalize(&state.storage.root).map_err(|_| "bad_media".to_string())?;
@@ -1093,12 +1109,20 @@ fn resolve_media_any(state: &AppState, id: &str, kinds: &[&str]) -> Result<Strin
     Ok(path.to_string_lossy().into_owned())
 }
 
-async fn job_status(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+async fn job_status(state: &AppState, owner: Uuid, metadata: &Value) -> Result<EnvelopeOut, String> {
     let job_id = metadata
         .get("job_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "bad_request".to_string())?;
     let uuid = Uuid::parse_str(job_id).map_err(|_| "bad_request".to_string())?;
+    let (queued, created) = state
+        .jobs
+        .get(&uuid)
+        .filter(|r| r.owner == owner)
+        .map(|r| (r.status == JobStatus::Queued, r.created))
+        .ok_or_else(|| "not_found".to_string())?;
+    // Read the queue before re-taking this job's entry, so no map guard is held while iterating.
+    let queue = queued.then(|| queue_position(state, created));
     let record = state
         .jobs
         .get(&uuid)
@@ -1123,6 +1147,8 @@ async fn job_status(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, S
             "ok": ok,
             "error": record.error,
             "gpus": record.gpus,
+            "queue_position": queue.map(|(position, _)| position),
+            "jobs_ahead": queue.map(|(_, ahead)| ahead),
         }),
         files: Vec::new(),
         error: None,
@@ -1177,7 +1203,7 @@ fn cgroup_available_ram_bytes() -> Option<u64> {
     Some(limit.saturating_sub(current.saturating_sub(reclaimable)))
 }
 
-async fn download_output(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+async fn download_output(state: &AppState, owner: Uuid, metadata: &Value) -> Result<EnvelopeOut, String> {
     let job_id = metadata
         .get("job_id")
         .and_then(|v| v.as_str())
@@ -1186,6 +1212,7 @@ async fn download_output(state: &AppState, metadata: &Value) -> Result<EnvelopeO
     let record = state
         .jobs
         .get(&uuid)
+        .filter(|r| r.owner == owner)
         .ok_or_else(|| "not_found".to_string())?;
     match record.status {
         JobStatus::Done => {}
@@ -1226,32 +1253,154 @@ async fn download_output(state: &AppState, metadata: &Value) -> Result<EnvelopeO
     })
 }
 
-async fn flush_all(state: &AppState) -> Result<EnvelopeOut, String> {
-    let ids: Vec<Uuid> = state.jobs.iter().map(|entry| *entry.key()).collect();
-    for id in &ids {
-        if let Some(mut job) = state.jobs.get_mut(id) {
-            job.status = JobStatus::Aborted;
-            job.stage = "aborted".into();
-            job.detail = "Flushed by user".into();
+/// Abort this session's jobs and zero-wipe its uploads and outputs; other users' work and the shared
+/// model cache are left alone.
+async fn flush_mine(state: &AppState, owner: Uuid) -> Result<EnvelopeOut, String> {
+    let mine: Vec<Uuid> = state.jobs.iter().filter(|j| j.owner == owner).map(|j| *j.key()).collect();
+    for id in &mine {
+        let running = state.jobs.get_mut(id).map_or(false, |mut job| {
+            let was_running = job.status == JobStatus::Running;
+            if matches!(job.status, JobStatus::Queued | JobStatus::Running) {
+                job.status = JobStatus::Aborted;
+                job.stage = "aborted".into();
+                job.detail = "Flushed by user".into();
+            }
+            was_running
+        });
+        if running {
+            let _ = state.ipc.control("abort", &id.to_string()).await;
         }
     }
-    let worker_ok = state.ipc.control("flush", "").await.is_ok();
-    state.storage.flush_all_now().await;
-    state.media.clear();
-    state.jobs.clear();
-    if !worker_ok {
-        return Err("flush_failed".into());
+    // ponytail: an aborted job that was already muxing may still write its MP4 after this; the TTL reaper removes it.
+    for id in &mine {
+        if let Some((_, job)) = state.jobs.remove(id) {
+            EphemeralStorage::secure_remove_file(&job.output).await;
+        }
+    }
+    let media: Vec<Uuid> = state.media.iter().filter(|m| m.owner == owner).map(|m| *m.key()).collect();
+    for id in &media {
+        if let Some((_, record)) = state.media.remove(id) {
+            EphemeralStorage::secure_remove_file(&record.path).await;
+        }
     }
     Ok(EnvelopeOut {
         ok: true,
         action: "flush_all".into(),
-        metadata: json!({
-            "flushed": true,
-            "revoked": true,
-        }),
+        metadata: json!({ "flushed": true, "revoked": true, "jobs": mine.len(), "media": media.len() }),
         files: Vec::new(),
         error: None,
     })
+}
+
+/// Live load for the System panel: per-GPU utilisation, VRAM, temperature and power, CPU, RAM and the queue.
+async fn system_stats(state: &AppState) -> EnvelopeOut {
+    let before = cpu_times();
+    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    let cpu_percent = match (before, cpu_times()) {
+        (Some((idle0, total0)), Some((idle1, total1))) if total1 > total0 => {
+            100.0 * (1.0 - (idle1 - idle0) as f64 / (total1 - total0) as f64)
+        }
+        _ => 0.0,
+    };
+    let mut gpus = Vec::new();
+    if let Some(nvml) = nvml() {
+        for index in 0..nvml.device_count().unwrap_or(0) {
+            let Ok(device) = nvml.device_by_index(index) else { continue };
+            let memory = device.memory_info().ok();
+            gpus.push(json!({
+                "index": index,
+                "name": device.name().unwrap_or_default(),
+                "util_percent": device.utilization_rates().ok().map(|u| u.gpu),
+                "mem_used_mb": memory.as_ref().map(|m| m.used / (1024 * 1024)),
+                "mem_total_mb": memory.as_ref().map(|m| m.total / (1024 * 1024)),
+                "temp_c": device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu).ok(),
+                "power_w": device.power_usage().ok().map(|mw| mw as f64 / 1000.0),
+                "power_limit_w": device.enforced_power_limit().ok().map(|mw| mw as f64 / 1000.0),
+                "fan_percent": device.fan_speed(0).ok(),
+            }));
+        }
+    }
+    let meminfo = std::fs::read_to_string("/proc/meminfo").unwrap_or_default();
+    let field = |key: &str| {
+        meminfo.lines().find_map(|line| line.strip_prefix(key)?.split_whitespace().next()?.parse::<u64>().ok())
+            .map(|kb| kb * 1024)
+    };
+    let (host_total, host_available) = (field("MemTotal:").unwrap_or(0), field("MemAvailable:").unwrap_or(0));
+    let cgroup = |name: &str| std::fs::read_to_string(format!("/sys/fs/cgroup/{name}")).ok()?.trim().parse::<u64>().ok();
+    let load1 = std::fs::read_to_string("/proc/loadavg").ok().and_then(|t| t.split_whitespace().next()?.parse::<f64>().ok());
+    let (mut running, mut queued) = (0, 0);
+    for job in state.jobs.iter() {
+        match job.status {
+            JobStatus::Running => running += 1,
+            JobStatus::Queued => queued += 1,
+            _ => {}
+        }
+    }
+    EnvelopeOut {
+        ok: true,
+        action: "system_stats".into(),
+        metadata: json!({
+            "gpus": gpus,
+            "cpu": {
+                "percent": cpu_percent,
+                "cores": std::thread::available_parallelism().map(|n| n.get()).unwrap_or(0),
+                "temp_c": cpu_temp_c(),
+                "load1": load1,
+            },
+            "ram": {
+                "container_used": cgroup("memory.current"),
+                "container_limit": cgroup("memory.max"),
+                "host_used": host_total.saturating_sub(host_available),
+                "host_total": host_total,
+            },
+            "queue": { "running": running, "queued": queued },
+        }),
+        files: Vec::new(),
+        error: None,
+    }
+}
+
+/// (idle, total) jiffies from the aggregate line of /proc/stat.
+fn cpu_times() -> Option<(u64, u64)> {
+    let text = std::fs::read_to_string("/proc/stat").ok()?;
+    let values: Vec<u64> = text.lines().next()?.split_whitespace().skip(1).filter_map(|v| v.parse().ok()).collect();
+    let idle = values.get(3)? + values.get(4).copied().unwrap_or(0);
+    Some((idle, values.iter().take(8).sum()))
+}
+
+/// CPU package temperature from hwmon (Intel coretemp, AMD k10temp/zenpower) or the x86_pkg_temp zone.
+fn cpu_temp_c() -> Option<f64> {
+    let read_milli = |path: std::path::PathBuf| {
+        std::fs::read_to_string(path).ok()?.trim().parse::<f64>().ok().map(|m| m / 1000.0)
+    };
+    for entry in std::fs::read_dir("/sys/class/hwmon").into_iter().flatten().flatten() {
+        let name = std::fs::read_to_string(entry.path().join("name")).unwrap_or_default();
+        if matches!(name.trim(), "coretemp" | "k10temp" | "zenpower" | "cpu_thermal") {
+            if let Some(temp) = read_milli(entry.path().join("temp1_input")) {
+                return Some(temp);
+            }
+        }
+    }
+    for entry in std::fs::read_dir("/sys/class/thermal").into_iter().flatten().flatten() {
+        if std::fs::read_to_string(entry.path().join("type")).unwrap_or_default().trim() == "x86_pkg_temp" {
+            return read_milli(entry.path().join("temp"));
+        }
+    }
+    None
+}
+
+/// (position among queued jobs, jobs ahead including the running one) for a job queued at `created`.
+fn queue_position(state: &AppState, created: Instant) -> (usize, usize) {
+    let mut before = 0;
+    let mut running = 0;
+    for job in state.jobs.iter() {
+        match job.status {
+            JobStatus::Queued if job.created < created => before += 1,
+            JobStatus::Running => running += 1,
+            _ => {}
+        }
+    }
+    (before + 1, before + running)
 }
 
 fn session_from_headers(headers: &HeaderMap) -> Option<Uuid> {
@@ -1338,6 +1487,13 @@ async fn ws_loop(mut socket: WebSocket, sid: Uuid, state: AppState) {
                     Err(broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(_) => break,
                 };
+                let mine = Uuid::parse_str(&event.job_id)
+                    .ok()
+                    .and_then(|id| state.jobs.get(&id).map(|job| job.owner == sid))
+                    .unwrap_or(false);
+                if !mine {
+                    continue;
+                }
                 let Some(session) = state.sessions.get(&sid) else {
                     break;
                 };
@@ -1383,6 +1539,9 @@ pub async fn sweep_sessions(state: AppState) {
 
 
 // ---- Agent API: the same handlers as the encrypted envelope, as plain JSON over TLS with a bearer token. ----
+
+/// Owner of everything created through the agent API (all agents share the token, so they share jobs).
+const AGENT: Uuid = Uuid::nil();
 
 fn agent_authorized(headers: &HeaderMap) -> Result<(), Response> {
     let Some(token) = std::env::var("MMH3_AGENT_TOKEN").ok().filter(|t| t.len() >= 16) else {
@@ -1451,7 +1610,7 @@ async fn agent_upload(
         kind: query.kind.clone(),
         data: body.to_vec(),
     }];
-    let result = upload_media(&state, &json!({ "kind": query.kind, "filename": name }), &mut files).await;
+    let result = upload_media(&state, AGENT, &json!({ "kind": query.kind, "filename": name }), &mut files).await;
     agent_reply(result, StatusCode::CREATED)
 }
 
@@ -1463,21 +1622,21 @@ async fn agent_generate(State(state): State<AppState>, headers: HeaderMap, Json(
     let task = body.get("task").and_then(|v| v.as_str()).unwrap_or("ref2v").to_string();
     let mut request = agent_defaults(&state, &task).await;
     merge_json(&mut request, body);
-    agent_reply(generate_video(&state, &request).await, StatusCode::ACCEPTED)
+    agent_reply(generate_video(&state, AGENT, &request).await, StatusCode::ACCEPTED)
 }
 
 async fn agent_job(State(state): State<AppState>, headers: HeaderMap, UrlPath(id): UrlPath<String>) -> Response {
     if let Err(denied) = agent_authorized(&headers) {
         return denied;
     }
-    agent_reply(job_status(&state, &json!({ "job_id": id })).await, StatusCode::OK)
+    agent_reply(job_status(&state, AGENT, &json!({ "job_id": id })).await, StatusCode::OK)
 }
 
 async fn agent_video(State(state): State<AppState>, headers: HeaderMap, UrlPath(id): UrlPath<String>) -> Response {
     if let Err(denied) = agent_authorized(&headers) {
         return denied;
     }
-    match download_output(&state, &json!({ "job_id": id })).await {
+    match download_output(&state, AGENT, &json!({ "job_id": id })).await {
         Ok(mut out) => match out.files.pop() {
             Some(file) => ([(header::CONTENT_TYPE, "video/mp4")], file.data).into_response(),
             None => agent_error("not_found".into()),
@@ -1549,9 +1708,9 @@ fn merge_json(base: &mut Value, over: Value) {
 // ---- Clip editing: extend from a finished clip, and merge trimmed clips into one MP4. ----
 
 /// The output file of a finished job, checked to live in the outputs directory.
-fn finished_output(state: &AppState, job_id: &str) -> Result<PathBuf, String> {
+fn finished_output(state: &AppState, owner: Uuid, job_id: &str) -> Result<PathBuf, String> {
     let uuid = Uuid::parse_str(job_id).map_err(|_| "bad_request".to_string())?;
-    let record = state.jobs.get(&uuid).ok_or_else(|| "not_found".to_string())?;
+    let record = state.jobs.get(&uuid).filter(|r| r.owner == owner).ok_or_else(|| "not_found".to_string())?;
     if record.status != JobStatus::Done {
         return Err("not_ready".into());
     }
@@ -1607,7 +1766,7 @@ async fn probe_size(path: &Path) -> Option<(u32, u32)> {
     Some((w.parse().ok()?, h.parse().ok()?))
 }
 
-async fn merge_clips(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, String> {
+async fn merge_clips(state: &AppState, owner: Uuid, metadata: &Value) -> Result<EnvelopeOut, String> {
     let req: MergeRequest = serde_json::from_value(metadata.clone()).map_err(|_| "bad_request".to_string())?;
     if req.clips.is_empty() || req.clips.len() > 24 {
         return Err("bad_request".into());
@@ -1618,7 +1777,7 @@ async fn merge_clips(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, 
         if !(clip.start >= 0.0 && clip.end - clip.start >= 0.1 && clip.end <= 3600.0) {
             return Err("bad_request".into());
         }
-        inputs.push(finished_output(state, &clip.job_id)?);
+        inputs.push(finished_output(state, owner, &clip.job_id)?);
         cuts.push((clip.start, clip.end));
     }
     let total_bytes: u64 = inputs.iter().filter_map(|p| std::fs::metadata(p).ok()).map(|m| m.len()).sum();
@@ -1649,6 +1808,7 @@ async fn merge_clips(state: &AppState, metadata: &Value) -> Result<EnvelopeOut, 
     state.jobs.insert(
         job_id,
         JobRecord {
+            owner,
             status: JobStatus::Done,
             stage: "done".into(),
             progress: 1.0,
@@ -1672,12 +1832,71 @@ async fn agent_merge(State(state): State<AppState>, headers: HeaderMap, Json(bod
     if let Err(denied) = agent_authorized(&headers) {
         return denied;
     }
-    agent_reply(merge_clips(&state, &body).await, StatusCode::CREATED)
+    agent_reply(merge_clips(&state, AGENT, &body).await, StatusCode::CREATED)
 }
 
 #[cfg(test)]
 mod agent_tests {
     use super::*;
+
+    async fn test_state() -> AppState {
+        let root = std::env::temp_dir().join(format!("mmh3-test-{}", Uuid::new_v4()));
+        let (progress, _) = broadcast::channel(8);
+        AppState {
+            storage: Arc::new(EphemeralStorage::create(root).await),
+            sessions: Arc::new(DashMap::new()),
+            media: Arc::new(DashMap::new()),
+            jobs: Arc::new(DashMap::new()),
+            progress,
+            model_root: PathBuf::from("/nonexistent"),
+            ipc: Arc::new(IpcClient::new(PathBuf::from("/nonexistent.sock"))),
+            job_slots: Arc::new(Semaphore::new(1)),
+        }
+    }
+
+    fn job(owner: Uuid, status: JobStatus, created: Instant, output: PathBuf) -> JobRecord {
+        JobRecord { owner, status, stage: String::new(), progress: 0.0, detail: String::new(), output, error: None, created, gpus: Vec::new() }
+    }
+
+    #[tokio::test]
+    async fn queue_positions_follow_submission_order_and_jobs_stay_private() {
+        let state = test_state().await;
+        let (alice, bob) = (Uuid::new_v4(), Uuid::new_v4());
+        let t0 = Instant::now();
+        let at = |ms| t0 + std::time::Duration::from_millis(ms);
+        let ids: Vec<Uuid> = (0..3).map(|_| Uuid::new_v4()).collect();
+        state.jobs.insert(ids[0], job(bob, JobStatus::Running, at(0), PathBuf::new()));
+        state.jobs.insert(ids[1], job(bob, JobStatus::Queued, at(10), PathBuf::new()));
+        state.jobs.insert(ids[2], job(alice, JobStatus::Queued, at(20), PathBuf::new()));
+        let status = job_status(&state, alice, &json!({ "job_id": ids[2].to_string() })).await.ok().unwrap();
+        assert_eq!(status.metadata["queue_position"], 2);
+        assert_eq!(status.metadata["jobs_ahead"], 2);
+        assert!(job_status(&state, alice, &json!({ "job_id": ids[1].to_string() })).await.is_err());
+        assert!(finished_output(&state, alice, &ids[0].to_string()).is_err());
+    }
+
+    #[tokio::test]
+    async fn flush_removes_only_the_callers_media_and_jobs() {
+        let state = test_state().await;
+        let (alice, bob) = (Uuid::new_v4(), Uuid::new_v4());
+        for (owner, name) in [(alice, "a.png"), (bob, "b.png")] {
+            let path = state.storage.uploads_dir.join(name);
+            std::fs::write(&path, b"x").unwrap();
+            state.media.insert(Uuid::new_v4(), MediaRecord { owner, path, kind: "image".into(), created: SystemTime::now() });
+            state.jobs.insert(Uuid::new_v4(), job(owner, JobStatus::Done, Instant::now(), PathBuf::from("/nonexistent.mp4")));
+        }
+        flush_mine(&state, alice).await.ok().unwrap();
+        assert!(state.media.iter().all(|m| m.owner == bob) && state.media.len() == 1);
+        assert!(state.jobs.iter().all(|j| j.owner == bob) && state.jobs.len() == 1);
+        assert!(!state.storage.uploads_dir.join("a.png").exists());
+        assert!(state.storage.uploads_dir.join("b.png").exists());
+    }
+
+    #[test]
+    fn cpu_times_read_idle_and_total_from_proc_stat() {
+        let (idle, total) = cpu_times().expect("/proc/stat");
+        assert!(total > idle);
+    }
 
     #[test]
     fn merge_filter_trims_fits_and_concatenates_every_clip() {
