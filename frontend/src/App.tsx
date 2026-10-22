@@ -415,7 +415,7 @@ export function App() {
   async function stopJob() {
     if (!jobId) return;
     setStopping(true);
-    setDetail("Stopping — the worker halts at its next checkpoint and frees the GPUs");
+    setDetail("Stopping — the worker halts at its next checkpoint, then moves the models off the GPUs (up to ~30 s)");
     pushLog("[■] Stop requested");
     try {
       const result = await client.call("cancel_job", { job_id: jobId });

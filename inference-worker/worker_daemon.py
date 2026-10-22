@@ -206,11 +206,12 @@ def coordinator(registry):
             run_job(cmd["payload"], registry, _progress, cmd["event"])
             box.put({"type": "result", "job_id": job_id, "payload": {"ok": True}})
         except JobAborted:
-            box.put(error_frame(job_id, "aborted"))
+            # A stop means "free the GPUs": release before replying, so "Stopped" means the memory is back.
             try:
-                release_gpu_memory(registry)  # a stop means "free the GPUs", not just "drop this job"
+                release_gpu_memory(registry)
             except Exception:
                 registry.trim_all_memory()
+            box.put(error_frame(job_id, "aborted"))
         except FileNotFoundError:
             box.put(error_frame(job_id, "model_missing"))
         except BadReference:
