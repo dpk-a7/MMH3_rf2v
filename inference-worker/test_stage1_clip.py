@@ -22,7 +22,7 @@ class Stage1ClipVramTests(unittest.TestCase):
         self.assertGreaterEqual(p.clip_activation_bytes({}), 9 * p.GIB)
 
     def test_dit_and_lora_load_after_stage1_encode(self):
-        src = inspect.getsource(p._run_job_inner)
+        src = inspect.getsource(p._render_segment)
         self.assertLess(src.index("_unload_device(enc_dev)"), src.index("_stage1_condition"))
         self.assertLess(src.index("_stage1_condition"), src.index("_load_unet"))
         self.assertLess(src.index("_stage1_condition"), src.index("_load_lora"))

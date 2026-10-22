@@ -15,6 +15,7 @@ import {
 } from "./components/GenerationControls";
 import { PanicFlushButton } from "./components/PanicFlushButton";
 import { PromptTagEditor } from "./components/PromptTagEditor";
+import { SequenceEditor } from "./components/SequenceEditor";
 import { KeyframeRack, ReferenceRack, emptySlots, type SlotState } from "./components/ReferenceRack";
 import { computeAlignedFrames, computeSize } from "./math";
 
@@ -58,6 +59,7 @@ export function App() {
   const [audios, setAudios] = useState<SlotState[]>(() => emptySlots(3));
   const [keyframes, setKeyframes] = useState<SlotState[]>(() => emptySlots(2));
   const [task, setTask] = useState<Task>("ref2v");
+  const [segments, setSegments] = useState<string[]>([]);
   const slotSetters: Record<SlotKind, Dispatch<SetStateAction<SlotState[]>>> = {
     image: setImages,
     video: setVideos,
@@ -323,6 +325,7 @@ export function App() {
   function handleResetToDefaults() {
     setSettings({ ...FACTORY_DEFAULTS });
     setPrompt(DEFAULT_PROMPT);
+    setSegments([]);
     setSeedText("");
   }
 
@@ -368,6 +371,7 @@ export function App() {
           end_percent: settings.controlEnd,
         },
         task,
+        segments: segments.map((text) => text.trim()).filter(Boolean),
         keyframes: task === "i2v" ? { first: keyframes[0].mediaId, last: keyframes[1].mediaId } : {},
         references:
           task === "ref2v"
@@ -515,6 +519,7 @@ export function App() {
         )}
         <section className="space-y-4">
           <PromptTagEditor prompt={prompt} setPrompt={setPrompt} bindInsert={bindInsert} showTags={task === "ref2v"} />
+          <SequenceEditor segments={segments} setSegments={setSegments} durationSec={settings.durationSec} busy={busy} />
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <label className="text-xs text-zinc-400">

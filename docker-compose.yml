@@ -53,6 +53,8 @@ services:
       - CC=gcc
       - TRITON_CACHE_DIR=/tmp/triton
       - MMH3_MIN_FREE_VRAM_GB=${MMH3_MIN_FREE_VRAM_GB:-6}
+      # Agent API (Specs.md §5.4) stays off unless this is set to a 16+ character secret.
+      - MMH3_AGENT_TOKEN=${MMH3_AGENT_TOKEN:-}
     ports:
       - "8443:8443"
     restart: unless-stopped

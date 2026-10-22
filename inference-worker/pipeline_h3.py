@@ -482,7 +482,7 @@ def _run_job_inner(
 
     def load(slot, subdir, name, loader, frac, label, key=None):
         verb = "Reusing cached" if registry.cached(slot, key or name) else "Loading"
-        report(f"load_{slot}", frac, f"{verb} {label} ({name}) for {plan[slot]}")
+        report(f"load_{slot}", frac, f"{verb} {label} ({name}) for {registry.plan[slot]}")
         obj = registry.get_or_swap(slot, subdir, name, loader, key=key, keep=keep)
         keep.add(slot)
         checkpoint()
@@ -501,6 +501,70 @@ def _run_job_inner(
             raise BadReference()
         control = load("controlnet", "controlnet", models["controlnet"], _load_controlnet, 0.16, "ControlNet")
 
+    prompts = [payload.get("prompt") or ""] + [p for p in (payload.get("segments") or []) if p]
+    total = len(prompts)
+    video_parts, audio_parts, guide = [], [], None
+    for index, prompt in enumerate(prompts):
+        def seg_report(stage, frac, detail, index=index):
+            if total == 1:
+                return report(stage, frac, detail)
+            return report(stage, (index + frac) / total, f"[{index + 1}/{total}] {detail}")
+
+        seg_payload = {**payload, "prompt": prompt, "keyframes": _segment_keyframes(payload, index, total)}
+        frames_rgb, waveform = _render_segment(
+            seg_payload, registry, seg_report, checkpoint, load, clip, video_vae, audio_vae, control, models, mode,
+            width, height, frames, seed + index, steps, denoise, scheduler, ref_mode, cn_cfg, strength, enc_dev,
+            num_refs, guide,
+        )
+        audio = _fit_audio(waveform, frames_rgb.shape[0])
+        # A continuation re-renders the previous tail at its start (the guide); drop those frames and their audio.
+        skip = GUIDE_FRAMES if guide is not None else 0
+        guide = (frames_rgb[-GUIDE_FRAMES:].clone(), audio[-GUIDE_FRAMES * AUDIO_PER_FRAME:].clone())
+        video_parts.append(_to_uint8(frames_rgb[skip:]))
+        audio_parts.append(audio[skip * AUDIO_PER_FRAME:])
+        del frames_rgb, waveform, audio
+        checkpoint()
+
+    report("stage3_mux", 0.97, "Muxing MP4 with FFmpeg" + (f" ({total} segments)" if total > 1 else ""))
+    try:
+        _mux(torch.cat(video_parts), torch.cat(audio_parts), width, height, fps, payload["output_path"])
+    except Exception as exc:
+        raise MuxFailed() from exc
+    del video_parts, audio_parts, guide
+    registry.trim_all_memory()
+    report("stage3_mux", 1.0, "ready")
+
+
+# Sequences anchor each continuation on the previous segment's last 5 frames (the model's shortest clip guide)
+# and the matching audio, via MiniMaxH3AddGuide at frame 0 - the multiframe mechanism from ComfyUI's H3 templates.
+GUIDE_FRAMES = 5
+AUDIO_PER_FRAME = 48000 // 24
+
+
+def _segment_keyframes(payload, index, total):
+    """User I2V keyframes: the first frame opens the sequence, the last frame closes it."""
+    keyframes = payload.get("keyframes") or {}
+    return {"first": keyframes.get("first") if index == 0 else None,
+            "last": keyframes.get("last") if index == total - 1 else None}
+
+
+def _to_uint8(frames_rgb):
+    return (frames_rgb.clamp(0, 1) * 255.0).round().to(torch.uint8).contiguous()
+
+
+def _fit_audio(waveform, n_frames):
+    """Trim or zero-pad stereo 48 kHz audio to exactly n_frames of video so segments stay in sync."""
+    target = n_frames * AUDIO_PER_FRAME
+    if waveform.shape[0] >= target:
+        return waveform[:target].contiguous()
+    return torch.cat([waveform, waveform.new_zeros(target - waveform.shape[0], 2)])
+
+
+def _render_segment(
+    payload, registry, report, checkpoint, load, clip, video_vae, audio_vae, control, models, mode,
+    width, height, frames, seed, steps, denoise, scheduler, ref_mode, cn_cfg, strength, enc_dev, num_refs, guide,
+):
+    """Stages 1-3 for one prompt; returns decoded frames [T, H, W, 3] in 0..1 and 48 kHz stereo audio [S, 2]."""
     # CLIPLoader pins the full ~16GB encoder. Drop it so encode reloads with the 9GB activation floor.
     report("stage1_encode", 0.18, f"Releasing full Qwen pin on {enc_dev} before vision encode")
     _unload_device(enc_dev)
@@ -538,12 +602,13 @@ def _run_job_inner(
             positive, latent = _encode_stage1()
         except ValueError as exc:
             raise BadReference() from exc
+    if guide is not None:
+        positive = _add_tail_guide(positive, latent, guide, video_vae, audio_vae, enc_dev)
     checkpoint()
 
     req2 = estimate_stage_memory_mb("stage2", width, height, frames, num_refs)
     schedule2 = registry.probe_and_plan("stage2", required_vram_mb=req2)
     dit_dev = schedule2.lead_device
-    plan = registry.plan
     if enc_dev == dit_dev:
         report("stage1_offload", 0.24, f"Offloading Stage 1 encoders from {enc_dev}")
         _unload_device(enc_dev)
@@ -609,14 +674,18 @@ def _run_job_inner(
     )
     checkpoint()
 
-    report("stage3_mux", 0.97, "Muxing MP4 with FFmpeg")
-    try:
-        _mux(frames_rgb, waveform, width, height, fps, payload["output_path"])
-    except Exception as exc:
-        raise MuxFailed() from exc
-    del frames_rgb, waveform, sampled
-    registry.trim_all_memory()
-    report("stage3_mux", 1.0, "ready")
+    del sampled
+    return frames_rgb, waveform
+
+
+def _add_tail_guide(positive, latent, guide, video_vae, audio_vae, device):
+    from comfy_extras.nodes_minimax_h3 import MiniMaxH3AddGuide
+
+    tail_frames, tail_audio = guide
+    with device_scope(device):
+        return _at(MiniMaxH3AddGuide.execute(
+            positive=positive, latent=latent, frame_idx=0, vae=video_vae, audio_vae=audio_vae,
+            image=tail_frames, audio=_audio_payload(tail_audio)), 0)
 
 
 def _first_frame_canvas(path, area):
@@ -1243,7 +1312,7 @@ def _mux(frames_rgb, waveform, width, height, fps, output_path):
     if parent != outputs:
         raise MuxFailed()
     os.makedirs(outputs, exist_ok=True)
-    video = (frames_rgb.clamp(0, 1) * 255.0).round().to(torch.uint8).contiguous()
+    video = frames_rgb if frames_rgb.dtype == torch.uint8 else _to_uint8(frames_rgb)
     if video.shape[1] != height or video.shape[2] != width or video.shape[-1] != 3:
         video = F.interpolate(
             video.permute(0, 3, 1, 2).float(),

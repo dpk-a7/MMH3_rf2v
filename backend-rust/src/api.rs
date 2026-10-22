@@ -4,7 +4,7 @@ use std::time::{Instant, SystemTime};
 
 use axum::body::Bytes;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{DefaultBodyLimit, Query, State};
+use axum::extract::{DefaultBodyLimit, Path as UrlPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -186,6 +186,12 @@ pub fn router(state: AppState, static_dir: PathBuf) -> Router {
         )
         .route("/api/v1/envelope", post(envelope))
         .route("/api/v1/ws", get(ws_upgrade))
+        // Plain-JSON API for agents (bearer token, off unless MMH3_AGENT_TOKEN is set); see Specs.md §5.4.
+        .route("/api/v1/agent/models", get(agent_models))
+        .route("/api/v1/agent/media", post(agent_upload))
+        .route("/api/v1/agent/jobs", post(agent_generate))
+        .route("/api/v1/agent/jobs/{id}", get(agent_job))
+        .route("/api/v1/agent/jobs/{id}/video", get(agent_video))
         .with_state(state);
     let spa = tower_http::services::ServeDir::new(static_dir).append_index_html_on_directories(true);
     api.fallback_service(spa)
@@ -596,8 +602,13 @@ struct GenerateRequest {
     task: String,
     #[serde(default)]
     keyframes: Keyframes,
+    /// Follow-on prompts: each continues from the previous segment's last frames and all are merged into one MP4.
+    #[serde(default)]
+    segments: Vec<String>,
     references: ReferenceSet,
 }
+
+const MAX_SEGMENTS: usize = 6;
 
 fn default_task() -> String {
     "ref2v".into()
@@ -697,6 +708,11 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         return Err("bad_request".into());
     }
     if req.task != "ref2v" && req.task != "i2v" {
+        return Err("bad_request".into());
+    }
+    if req.segments.len() > MAX_SEGMENTS - 1
+        || req.segments.iter().any(|p| p.trim().is_empty() || p.len() > 16_000)
+    {
         return Err("bad_request".into());
     }
     let max_steps = if req.mode == "turbo" { 20 } else { 50 };
@@ -809,6 +825,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
     let est_output = (width as u64)
         .saturating_mul(height as u64)
         .saturating_mul(frames as u64)
+        .saturating_mul(1 + req.segments.len() as u64)
         / 16;
     check_system_gates(&state.storage.root, est_output.max(512 * 1024 * 1024), est_ram)?;
     if state.job_slots.available_permits() == 0 {
@@ -875,6 +892,7 @@ async fn generate_video(state: &AppState, metadata: &Value) -> Result<EnvelopeOu
         },
         "task": req.task,
         "keyframes": {"first": first_frame, "last": last_frame},
+        "segments": req.segments,
         "references": {
             "images": images,
             "videos": videos,
@@ -1350,5 +1368,198 @@ pub async fn sweep_sessions(state: AppState) {
                 < TTL_SECONDS
                 && media.path.exists()
         });
+    }
+}
+
+
+// ---- Agent API: the same handlers as the encrypted envelope, as plain JSON over TLS with a bearer token. ----
+
+fn agent_authorized(headers: &HeaderMap) -> Result<(), Response> {
+    let Some(token) = std::env::var("MMH3_AGENT_TOKEN").ok().filter(|t| t.len() >= 16) else {
+        return Err(StatusCode::NOT_FOUND.into_response());
+    };
+    let given = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("");
+    let same = given.len() == token.len()
+        && given.bytes().zip(token.bytes()).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0;
+    if same {
+        Ok(())
+    } else {
+        Err(StatusCode::UNAUTHORIZED.into_response())
+    }
+}
+
+fn agent_error(code: String) -> Response {
+    let status = match code.as_str() {
+        "not_found" => StatusCode::NOT_FOUND,
+        "not_ready" => StatusCode::CONFLICT,
+        "server_busy" => StatusCode::SERVICE_UNAVAILABLE,
+        c if c.starts_with("insufficient_") => StatusCode::INSUFFICIENT_STORAGE,
+        _ => StatusCode::BAD_REQUEST,
+    };
+    (status, Json(json!({ "error": code }))).into_response()
+}
+
+fn agent_reply(result: Result<EnvelopeOut, String>, status: StatusCode) -> Response {
+    match result {
+        Ok(out) => (status, Json(out.metadata)).into_response(),
+        Err(code) => agent_error(code),
+    }
+}
+
+async fn agent_models(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    Json(list_models(&state).await.metadata).into_response()
+}
+
+#[derive(Deserialize)]
+struct AgentUploadQuery {
+    kind: String,
+    #[serde(default)]
+    filename: Option<String>,
+}
+
+/// Raw file bytes in the body, e.g. `curl --data-binary @frame.png ".../media?kind=image&filename=frame.png"`.
+async fn agent_upload(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<AgentUploadQuery>,
+    body: Bytes,
+) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    let name = query.filename.unwrap_or_else(|| format!("upload.{}", query.kind));
+    let mut files = vec![EnvelopeFile {
+        name: name.clone(),
+        mime: String::new(),
+        kind: query.kind.clone(),
+        data: body.to_vec(),
+    }];
+    let result = upload_media(&state, &json!({ "kind": query.kind, "filename": name }), &mut files).await;
+    agent_reply(result, StatusCode::CREATED)
+}
+
+/// Same body as the UI's generate_video; anything left out takes the defaults below.
+async fn agent_generate(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    let task = body.get("task").and_then(|v| v.as_str()).unwrap_or("ref2v").to_string();
+    let mut request = agent_defaults(&state, &task).await;
+    merge_json(&mut request, body);
+    agent_reply(generate_video(&state, &request).await, StatusCode::ACCEPTED)
+}
+
+async fn agent_job(State(state): State<AppState>, headers: HeaderMap, UrlPath(id): UrlPath<String>) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    agent_reply(job_status(&state, &json!({ "job_id": id })).await, StatusCode::OK)
+}
+
+async fn agent_video(State(state): State<AppState>, headers: HeaderMap, UrlPath(id): UrlPath<String>) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    match download_output(&state, &json!({ "job_id": id })).await {
+        Ok(mut out) => match out.files.pop() {
+            Some(file) => ([(header::CONTENT_TYPE, "video/mp4")], file.data).into_response(),
+            None => agent_error("not_found".into()),
+        },
+        Err(code) => agent_error(code),
+    }
+}
+
+/// A complete generate_video request for `task`, using whichever model files are installed.
+async fn agent_defaults(state: &AppState, task: &str) -> Value {
+    let d = GenerationConfigDefaults::default();
+    let pick = |list: &[String], preferred: &str, hint: &str| -> String {
+        if list.iter().any(|m| m == preferred) {
+            return preferred.to_string();
+        }
+        list.iter()
+            .find(|m| m.to_ascii_lowercase().contains(hint))
+            .or(list.first())
+            .cloned()
+            .unwrap_or_else(|| preferred.to_string())
+    };
+    let root = &state.model_root;
+    let diffusion = scan_safetensors(&root.join("diffussion")).await;
+    let vae = scan_safetensors(&root.join("vae")).await;
+    let clip = scan_safetensors(&root.join("clip")).await;
+    let lora = scan_safetensors(&root.join("lora")).await;
+    let (dit, dit_hint) = if task == "i2v" {
+        ("fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "fasth3_8step_v2")
+    } else {
+        (d.diffusion_model.as_str(), "omniref")
+    };
+    json!({
+        "task": task,
+        "models": {
+            "diffusion": pick(&diffusion, dit, dit_hint),
+            "video_vae": pick(&vae, &d.video_vae_model, "video"),
+            "audio_vae": pick(&vae, &d.audio_vae_model, "audio"),
+            "clip": pick(&clip, &d.clip_model, "qwen"),
+            "lora": pick(&lora, &d.lora_model, "turbo"),
+        },
+        "mode": "normal",
+        "steps": d.steps,
+        "lora_strength": d.lora_strength,
+        "duration_sec": d.duration_sec,
+        "aspect_ratio": d.aspect_ratio,
+        "megapixels": d.megapixels,
+        "fps": d.fps,
+        "ref_image_size": d.ref_image_size,
+        "sampler_name": d.sampler_name,
+        "scheduler": d.scheduler,
+        "denoise": d.denoise,
+        "keyframes": {},
+        "segments": [],
+        "references": {},
+    })
+}
+
+fn merge_json(base: &mut Value, over: Value) {
+    match (base, over) {
+        (Value::Object(base), Value::Object(over)) => {
+            for (key, value) in over {
+                merge_json(base.entry(key).or_insert(Value::Null), value);
+            }
+        }
+        (base, over) => *base = over,
+    }
+}
+
+#[cfg(test)]
+mod agent_tests {
+    use super::*;
+
+    #[test]
+    fn agent_body_overrides_defaults_and_keeps_the_rest() {
+        let mut request = json!({ "models": { "diffusion": "a", "clip": "c" }, "steps": 8, "segments": [] });
+        merge_json(&mut request, json!({ "models": { "diffusion": "b" }, "segments": ["next"] }));
+        assert_eq!(request["models"], json!({ "diffusion": "b", "clip": "c" }));
+        assert_eq!(request["steps"], 8);
+        assert_eq!(request["segments"], json!(["next"]));
+    }
+
+    #[test]
+    fn agent_api_needs_a_long_matching_bearer_token() {
+        let mut headers = HeaderMap::new();
+        std::env::remove_var("MMH3_AGENT_TOKEN");
+        assert_eq!(agent_authorized(&headers).unwrap_err().status(), StatusCode::NOT_FOUND);
+        std::env::set_var("MMH3_AGENT_TOKEN", "0123456789abcdef");
+        assert_eq!(agent_authorized(&headers).unwrap_err().status(), StatusCode::UNAUTHORIZED);
+        headers.insert(header::AUTHORIZATION, "Bearer 0123456789abcdeX".parse().unwrap());
+        assert_eq!(agent_authorized(&headers).unwrap_err().status(), StatusCode::UNAUTHORIZED);
+        headers.insert(header::AUTHORIZATION, "Bearer 0123456789abcdef".parse().unwrap());
+        assert!(agent_authorized(&headers).is_ok());
+        std::env::remove_var("MMH3_AGENT_TOKEN");
     }
 }

@@ -708,6 +708,24 @@ fn is_selectable_model_file(name: &str) -> bool {
 
 ---
 
+## 5.4. Agent API & MCP Server
+
+Agents use plain JSON over the same TLS port with `Authorization: Bearer $MMH3_AGENT_TOKEN`. The routes return 404 unless `MMH3_AGENT_TOKEN` (16+ characters) is set for the container; nothing is logged. They call the same handlers as the encrypted envelope.
+
+| Route | Body / result |
+|---|---|
+| `GET /api/v1/agent/models` | Installed models, defaults, GPU topology |
+| `POST /api/v1/agent/media?kind=image\|video\|audio&filename=x.png` | Raw file bytes → `201 {"media_id"}` |
+| `POST /api/v1/agent/jobs` | The `generate_video` body (§5.3). Omitted fields take defaults: installed models for the task, 8 steps, 5 s, 0.4 MP 16:9 → `202 {"job_id"}` |
+| `GET /api/v1/agent/jobs/{id}` | `status`, `stage`, `progress`, `detail`, `done`, `ok`, `error` |
+| `GET /api/v1/agent/jobs/{id}/video` | The MP4 (`409 not_ready` until done) |
+
+`mcp/mmh3_mcp.py` wraps these as MCP tools (`list_models`, `generate_video`, `get_job`, `download_video`) over stdio: `MMH3_URL=https://<host>:8443 MMH3_AGENT_TOKEN=… MMH3_INSECURE_TLS=1 uv run mcp/mmh3_mcp.py`. The server's certificate is self-generated; point `MMH3_CA_CERT` at it instead of `MMH3_INSECURE_TLS=1` where possible.
+
+### 5.5. Sequences
+
+`segments` (up to 5 extra prompts) renders one segment per prompt with the same settings and merges them into one MP4. Each continuation is anchored on the previous segment's last 5 frames and their audio with `MiniMaxH3AddGuide` at frame 0, the multiframe mechanism from ComfyUI's H3 templates; those 5 re-rendered frames and their audio are dropped when merging. For I2V the user's first frame opens the sequence and the last frame closes it. Models stay loaded between segments, and each segment uses `seed + index`.
+
 ## 6. (Updated) Pinned-RAM Model Registry & Hot-Swapping (`inference-worker/memory_manager.py`)
 
 When the user selects a different diffusion, VAE, CLIP, LoRA, or ControlNet file in the UI Model Selector, the GPU worker must safely evict the previously cached weights from Pinned Host RAM before loading the new file so system RAM never leaks or OOMs. The implementation (`ModelRegistry`) follows this sketch and also applies the per-model RAM gate (§4.4) and loads each model under its planned GPU (§4.2–4.3):
