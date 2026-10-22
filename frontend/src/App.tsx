@@ -34,7 +34,25 @@ const ROLE_LABEL: Record<string, string> = {
   bypassed_busy: "busy",
 };
 
-type Clip = { id: string; url: string; prompt: string; meta: string };
+type Clip = { id: string; url: string; prompt: string; meta: string; took?: number };
+
+function fmtDuration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+}
+
+/** Remaining ms from the progress rate since the latest sample at least 20 s old (model loading makes the
+ * whole-job average misleading early on); null until there is a rate to go on. */
+function estimateEta(history: [number, number][], now: number): number | null {
+  const last = history[history.length - 1];
+  if (!last || last[1] < 0.05 || last[1] >= 1) return null;
+  let past = history[0];
+  for (const sample of history) if (last[0] - sample[0] >= 20_000) past = sample;
+  const rate = (last[1] - past[1]) / (last[0] - past[0]);
+  return rate > 0 ? Math.max(0, (1 - last[1]) / rate - (now - last[0])) : null;
+}
 type JobInfo = Omit<Clip, "id" | "url"> & { after?: string };
 
 export function App() {
@@ -74,6 +92,9 @@ export function App() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [clips, setClips] = useState<Clip[]>([]);
   const activeJob = useRef<string | null>(null);
+  const jobStart = useRef(0);
+  const progressHistory = useRef<[number, number][]>([]);
+  const [now, setNow] = useState(() => Date.now());
   const jobInfo = useRef<Record<string, JobInfo>>({});
   const [scene, setScene] = useState<SceneItem[]>([]);
   const [view, setView] = useState<"clips" | "scene">("clips");
@@ -177,6 +198,8 @@ export function App() {
     }
     setStage(event.stage);
     setProgress(event.progress);
+    const history = progressHistory.current;
+    if (!history.length || event.progress > history[history.length - 1][1]) history.push([Date.now(), event.progress]);
     if (event.detail) {
       setDetail(event.detail);
       setStatus(`${event.stage}: ${event.detail}`);
@@ -186,6 +209,8 @@ export function App() {
     }
     if (event.done) {
       setBusy(false);
+      const info = jobInfo.current[event.job_id];
+      if (info && info.took === undefined && jobStart.current) info.took = Date.now() - jobStart.current;
       if (event.ok) {
         setStatus("Ready");
         pushLog("[100%] Complete — fetching encrypted MP4");
@@ -367,9 +392,18 @@ export function App() {
     setSeedText("");
   }
 
+  useEffect(() => {
+    if (!busy) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
   async function generate() {
     setError("");
     setBusy(true);
+    jobStart.current = Date.now();
+    progressHistory.current = [];
+    setNow(Date.now());
     setProgress(0.01);
     setStage("queued");
     setDetail("Validating request & checking system VRAM/RAM gates...");
@@ -495,6 +529,7 @@ export function App() {
   }
 
   const pct = Math.round(progress * 100);
+  const eta = estimateEta(progressHistory.current, now);
   const extending = clips.find((clip) => clip.id === continueFrom);
   const tab = (id: "clips" | "scene", label: string) => (
     <button
@@ -550,7 +585,15 @@ export function App() {
             <section className="glass rounded-3xl p-4" aria-live="polite">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">{busy ? "Generating" : stage}</span>
-                <span className="font-mono text-xs text-zinc-400">{pct}%</span>
+                <span className="font-mono text-xs text-zinc-300">
+                  {pct}%
+                  {busy && jobStart.current > 0 && (
+                    <>
+                      <span className="text-zinc-500"> · </span>⏱ {fmtDuration(now - jobStart.current)}
+                      <span className="text-zinc-500"> · </span>ETA {eta === null ? "estimating…" : `~${fmtDuration(eta)}`}
+                    </>
+                  )}
+                </span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
@@ -607,7 +650,10 @@ export function App() {
                   <figcaption className="space-y-2 p-3">
                     <p className="line-clamp-2 text-sm text-zinc-200">{clip.prompt || "Untitled"}</p>
                     <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
-                      <span className="mr-auto">{clip.meta}</span>
+                      <span className="mr-auto">
+                        {clip.meta}
+                        {clip.took ? ` · ⏱ ${fmtDuration(clip.took)}` : ""}
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
