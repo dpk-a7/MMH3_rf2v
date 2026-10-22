@@ -781,7 +781,104 @@ def _patch_attention(model, positive, task="ref2v"):
         # FastH3 is trained against VSA at keep 10% and must never run plain block-sparse attention.
         # Skipped under ControlNet: VSA claims every block patch the control injection needs (dense is safe).
         model = _at(BlockSparseAttention.execute(model, {"selection": "vsa", "keep_percent": 10.0}, vsa_start, 1.0), 0)
+    if not _has_control(positive):
+        _install_chunked_blocks(model)
     return model, sampler
+
+
+# A DiT block holds ~100 KB of activations per token (fused qkv, attention copies, the 2x14336 MLP input), so a
+# 1920x1088x362 clip (~219k tokens) needs ~22 GB inside one block. Above this size blocks run in token chunks
+# with the same math; smaller jobs keep ComfyUI's own block untouched.
+CHUNK_ABOVE_TOKENS = 120_000
+CHUNK_TOKENS = 16_384
+
+
+def _seg_slice(segments, i, j):
+    """Modulation segments restricted to rows [i, j), re-based to the chunk."""
+    out = []
+    for a, b, row in segments:
+        lo, hi = max(a, i), min(b, j)
+        if lo < hi:
+            out.append((lo - i, hi - i, row[lo - a:hi - a] if torch.is_tensor(row) and row.ndim else row))
+    return out
+
+
+def _chunked_attention(block, x, segments, rope_freqs, shift, scale, gate, spans):
+    """Dense self-attention with q/k/v built chunk by chunk; queries attend all keys, outputs gate into x."""
+    import comfy.model_management as mm
+    import comfy.quant_ops
+    from comfy.ldm.minimax.model import _mod_gate, _mod_scale_shift
+
+    attn = block.attn
+    heads, dim, n = attn.heads, attn.head_dim, x.shape[0]
+    q_all = k_all = v_all = None
+    for i, j in spans:
+        h = _mod_scale_shift(block.norm1(x[i:j]), shift, scale, _seg_slice(segments, i, j))
+        q, k, v = attn.qkv_proj(h).split(heads * dim, dim=-1)
+        del h
+        q, k = q.view(1, j - i, heads, dim), k.view(1, j - i, heads, dim)
+        if rope_freqs is not None:
+            qw = mm.cast_to(attn.q_norm.weight, device=x.device)
+            kw = mm.cast_to(attn.k_norm.weight, device=x.device)
+            comfy.quant_ops.ck.rms_rope_split_half_(
+                q, k, rope_freqs[:, i:j], qw, kw, epsilon=attn.q_norm.eps, rot_dim=rope_freqs.shape[-3] * 2)
+        else:
+            q, k = attn.q_norm(q), attn.k_norm(k)
+        if q_all is None:  # the projection's dtype, not the residual stream's
+            q_all, k_all, v_all = (q.new_empty(1, heads, n, dim) for _ in range(3))
+        q_all[0, :, i:j] = q[0].transpose(0, 1)
+        k_all[0, :, i:j] = k[0].transpose(0, 1)
+        v_all[0, :, i:j] = v.view(j - i, heads, dim).transpose(0, 1)
+    for i, j in spans:
+        out = F.scaled_dot_product_attention(q_all[:, :, i:j], k_all, v_all)
+        out = attn.out_proj(out[0].transpose(0, 1).reshape(j - i, heads * dim))
+        _mod_gate(x[i:j], gate, out, _seg_slice(segments, i, j))
+
+
+def _chunked_block(block, x, t_emb, segments, rope_freqs, transformer_options, attention=None):
+    """DiTBlock.forward over token chunks. A VSA `attention` already builds q/k/v in slices, so it gets the full h."""
+    from comfy.ldm.minimax.model import _mod_gate, _mod_scale_shift
+
+    n = x.shape[0]
+    shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = block.adaln_proj(t_emb)
+    spans = [(i, min(n, i + CHUNK_TOKENS)) for i in range(0, n, CHUNK_TOKENS)]
+    if attention is None:
+        _chunked_attention(block, x, segments, rope_freqs, shift_msa, scale_msa, gate_msa, spans)
+    else:
+        h = _mod_scale_shift(block.norm1(x), shift_msa, scale_msa, segments)
+        out = attention(h, rope_freqs=rope_freqs, transformer_options=transformer_options)
+        del h
+        x = _mod_gate(x, gate_msa, out, segments)
+        del out
+    for i, j in spans:
+        seg = _seg_slice(segments, i, j)
+        h = _mod_scale_shift(block.norm2(x[i:j]), shift_mlp, scale_mlp, seg)
+        _mod_gate(x[i:j], gate_mlp, block.mlp(h), seg)
+    return x
+
+
+def _install_chunked_blocks(model):
+    """Wrap every H3 block, and any VSA patch already on it, so long sequences take _chunked_block."""
+    try:
+        blocks = model.get_model_object("diffusion_model").blocks
+    except AttributeError:
+        return
+    dit = model.model_options["transformer_options"].get("patches_replace", {}).get("dit", {})
+    for index, block in enumerate(blocks):
+        model.set_model_patch_replace(_chunked_patch(block, dit.get(("double_block", index))), "dit", "double_block", index)
+
+
+def _chunked_patch(block, previous):
+    def run(args):
+        return {"img": _chunked_block(block, args["img"], args["t_emb"], args["mod_segments"], args["rope_freqs"],
+                                      args["transformer_options"], args.get("attention"))}
+
+    def patch(args, extra):
+        if args["img"].shape[0] > CHUNK_ABOVE_TOKENS:
+            extra = {**extra, "original_block": run}
+        return previous(args, extra) if previous is not None else extra["original_block"](args)
+
+    return patch
 
 
 def _stage2_sample(model, positive, latent, steps, denoise, scheduler, seed, checkpoint, report, registry=None,

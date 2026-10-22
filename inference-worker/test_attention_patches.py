@@ -25,29 +25,62 @@ def block_patches(model):
     return sorted(replace.get("dit", {}))
 
 
+def has_vsa(model):
+    import comfy.patcher_extension
+
+    return "block_sparse_attention" in model.callbacks.get(comfy.patcher_extension.CallbacksMP.ON_CLEANUP, {})
+
+
+ALL_BLOCKS = [("double_block", 0), ("double_block", 1)]
+
+
 class AttentionPatchTests(unittest.TestCase):
     def test_base_model_gets_kitchen_attention_and_keeps_res_multistep(self):
         model, sampler = pipeline._patch_attention(tiny_h3(vsa=False), [])
         self.assertEqual(sampler, "res_multistep")
         self.assertIn("optimized_attention_override", model.model_options["transformer_options"])
-        self.assertEqual(block_patches(model), [])
+        self.assertFalse(has_vsa(model))
+        self.assertEqual(block_patches(model), ALL_BLOCKS)  # long-sequence chunking wrappers only
 
     def test_fasth3_gets_vsa_on_every_block_and_euler(self):
         model, sampler = pipeline._patch_attention(tiny_h3(vsa=True), [])
         self.assertEqual(sampler, "euler")
-        self.assertEqual(block_patches(model), [("double_block", 0), ("double_block", 1)])
+        self.assertTrue(has_vsa(model))
+        self.assertEqual(block_patches(model), ALL_BLOCKS)
 
     def test_fasth3_i2v_uses_the_v2_recipe(self):
         model, sampler = pipeline._patch_attention(tiny_h3(vsa=True), [], "i2v")
         self.assertEqual(sampler, "res_multistep")
         self.assertEqual(model.model_options["transformer_options"]["minimax_h3_sigma_shift_video"], 10.0)
-        self.assertEqual(block_patches(model), [("double_block", 0), ("double_block", 1)])
+        self.assertTrue(has_vsa(model))
 
     def test_fasth3_stays_dense_under_controlnet(self):
         positive = [[torch.zeros(1), {"control": object()}]]
         model, sampler = pipeline._patch_attention(tiny_h3(vsa=True), positive)
         self.assertEqual(sampler, "euler")
         self.assertEqual(block_patches(model), [])
+
+
+class ChunkedBlockTests(unittest.TestCase):
+    def test_chunked_block_matches_comfy_block(self):
+        from unittest import mock
+
+        from comfy.ldm.minimax.model import rope_rotation_table
+
+        torch.manual_seed(0)
+        block = tiny_h3(vsa=False).get_model_object("diffusion_model").blocks[0]
+        for name, param in block.named_parameters():  # comfy ops leave weights uninitialised
+            param.data.copy_(torch.ones_like(param) if "norm" in name else torch.randn_like(param) * 0.05)
+        n = 300
+        x = torch.randn(n, 256)
+        t_emb = torch.randn(2, 64)
+        segments = [(0, 120, 0), (120, 300, torch.arange(180) % 2 * 3)]  # a plain row and per-token rows
+        rope = rope_rotation_table(torch.randn(n, 32), torch.float32)
+        with torch.no_grad():
+            expected = block(x.clone(), t_emb, segments, rope)
+            with mock.patch.object(pipeline, "CHUNK_TOKENS", 64):
+                got = pipeline._chunked_block(block, x.clone(), t_emb, segments, rope, {})
+        torch.testing.assert_close(got, expected, rtol=1e-4, atol=1e-4)
 
 
 if __name__ == "__main__":
