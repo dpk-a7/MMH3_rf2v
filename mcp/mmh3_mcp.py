@@ -120,6 +120,13 @@ async def merge_clips(clips: list[dict], output_path: str | None = None) -> dict
 
 
 @mcp.tool()
+async def cancel_job(job_id: str) -> dict:
+    """Stop a queued or running job; a running job halts at its next checkpoint and the GPUs are freed."""
+    async with _client() as client:
+        return await _json(await client.post(f"/jobs/{job_id}/cancel"))
+
+
+@mcp.tool()
 async def get_job(job_id: str) -> dict:
     """Status of a job: status, stage, progress (0-1), detail, done, ok, error."""
     async with _client() as client:

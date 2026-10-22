@@ -68,5 +68,19 @@ class SequenceTests(unittest.TestCase):
         self.assertEqual(keyframes[2], {"first": None, "last": "b.png"})
 
 
+class ReleaseTests(unittest.TestCase):
+    def test_stop_parks_cached_vaes_in_ram_and_keeps_their_gpu(self):
+        patcher = type("Patcher", (), {"load_device": "cuda:1", "offload_device": "cuda:1"})()
+        vae = type("Vae", (), {})()
+        vae.patcher, vae.first_stage_model = patcher, torch.nn.Linear(2, 2)
+        registry = FakeRegistry()
+        registry.loaded_slots = {"video_vae": {"module": vae}, "audio_vae": {"module": None}}
+        with mock.patch.object(registry, "trim_all_memory") as trimmed:
+            p.release_gpu_memory(registry)
+        self.assertEqual(patcher.offload_device, p.CPU)
+        self.assertEqual(patcher.load_device, "cuda:1")  # the next decode goes back to its GPU
+        trimmed.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

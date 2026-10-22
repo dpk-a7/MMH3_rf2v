@@ -63,6 +63,7 @@ export function App() {
   const systemDialog = useRef<HTMLDialogElement>(null);
   const [systemOpen, setSystemOpen] = useState(false);
   const [queue, setQueue] = useState<{ position: number; ahead: number } | null>(null);
+  const [stopping, setStopping] = useState(false);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Securing session");
   const [error, setError] = useState("");
@@ -213,9 +214,15 @@ export function App() {
     }
     if (event.done) {
       setBusy(false);
+      setStopping(false);
+      setQueue(null);
       const info = jobInfo.current[event.job_id];
       if (info && info.took === undefined && jobStart.current) info.took = Date.now() - jobStart.current;
-      if (event.ok) {
+      if (!event.ok && event.detail === "aborted") {
+        setError("");
+        setStatus("Stopped");
+        pushLog("[■] Stopped — GPU memory released");
+      } else if (event.ok) {
         setStatus("Ready");
         pushLog("[100%] Complete — fetching encrypted MP4");
         void pullOutput(event.job_id);
@@ -404,6 +411,23 @@ export function App() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [busy]);
+
+  async function stopJob() {
+    if (!jobId) return;
+    setStopping(true);
+    setDetail("Stopping — the worker halts at its next checkpoint and frees the GPUs");
+    pushLog("[■] Stop requested");
+    try {
+      const result = await client.call("cancel_job", { job_id: jobId });
+      if (!result.ok) {
+        setStopping(false);
+        setError(result.error || "cancel_failed");
+      }
+    } catch (err) {
+      setStopping(false);
+      setError(err instanceof Error ? err.message : "cancel_failed");
+    }
+  }
 
   async function generate() {
     setError("");
@@ -602,7 +626,20 @@ export function App() {
           {(busy || (stage && stage !== "done" && !clips.length)) && (
             <section className="glass rounded-3xl p-4" aria-live="polite">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{busy ? (queue ? "In queue" : "Generating") : stage}</span>
+                <span className="flex items-center gap-3 font-medium">
+                  {busy ? (stopping ? "Stopping…" : queue ? "In queue" : "Generating") : stage}
+                  {busy && (
+                    <button
+                      type="button"
+                      disabled={stopping}
+                      onClick={() => void stopJob()}
+                      className="rounded-full border border-red-400/40 px-2.5 py-0.5 text-[11px] font-medium text-red-200 hover:bg-red-500/15 disabled:opacity-50"
+                      title="Stop this generation and free the GPUs"
+                    >
+                      ■ Stop
+                    </button>
+                  )}
+                </span>
                 <span className="font-mono text-xs text-zinc-300">
                   {pct}%
                   {busy && jobStart.current > 0 && (
@@ -725,6 +762,8 @@ export function App() {
             onPick={(kind, index, file) => void onPick(kind, index, file)}
             onClear={onClear}
             onGenerate={() => void generate()}
+            onStop={() => void stopJob()}
+            stopping={stopping}
           />
         </div>
       </div>

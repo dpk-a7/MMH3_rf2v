@@ -12,7 +12,7 @@ import msgpack
 import torch
 
 from memory_manager import ModelRegistry, ResourceLimitExceeded
-from pipeline_h3 import BadReference, JobAborted, MuxFailed, _cuda_oom, _failure_text, run_job
+from pipeline_h3 import BadReference, JobAborted, MuxFailed, _cuda_oom, _failure_text, release_gpu_memory, run_job
 
 WRITE_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
@@ -207,6 +207,10 @@ def coordinator(registry):
             box.put({"type": "result", "job_id": job_id, "payload": {"ok": True}})
         except JobAborted:
             box.put(error_frame(job_id, "aborted"))
+            try:
+                release_gpu_memory(registry)  # a stop means "free the GPUs", not just "drop this job"
+            except Exception:
+                registry.trim_all_memory()
         except FileNotFoundError:
             box.put(error_frame(job_id, "model_missing"))
         except BadReference:

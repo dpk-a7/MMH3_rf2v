@@ -50,6 +50,8 @@ export function Composer({
   onPick,
   onClear,
   onGenerate,
+  onStop,
+  stopping,
 }: {
   task: Task;
   onTask: (task: Task) => void;
@@ -73,6 +75,8 @@ export function Composer({
   onPick: (kind: SlotKind, index: number, file: File) => void;
   onClear: (kind: SlotKind, index: number) => void;
   onGenerate: () => void;
+  onStop: () => void;
+  stopping: boolean;
 }): ReactElement {
   const area = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -327,13 +331,24 @@ export function Composer({
         </span>
         <button
           type="button"
-          disabled={!canGenerate}
-          onClick={onGenerate}
-          aria-label={busy ? "Generating" : "Generate"}
-          title="Generate (Ctrl+Enter)"
-          className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-white to-zinc-300 text-lg font-bold text-zinc-900 shadow-lg shadow-indigo-500/20 transition hover:brightness-105 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500 disabled:shadow-none sm:ml-0"
+          disabled={busy ? stopping : !canGenerate}
+          onClick={busy ? onStop : onGenerate}
+          aria-label={busy ? "Stop generation" : "Generate"}
+          title={busy ? "Stop this generation and free the GPUs" : "Generate (Ctrl+Enter)"}
+          className={`relative ml-auto flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold shadow-lg transition sm:ml-0 ${
+            busy
+              ? "bg-red-500/90 text-white shadow-red-500/30 hover:bg-red-500 disabled:opacity-60"
+              : "bg-gradient-to-br from-white to-zinc-300 text-zinc-900 shadow-indigo-500/20 hover:brightness-105 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-500 disabled:shadow-none"
+          }`}
         >
-          {busy ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-500 border-t-zinc-900" /> : "→"}
+          {busy ? (
+            <>
+              <span className="absolute inset-0 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+              <span className="h-3 w-3 rounded-[3px] bg-white" />
+            </>
+          ) : (
+            "→"
+          )}
         </button>
       </div>
     </div>

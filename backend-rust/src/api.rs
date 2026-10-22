@@ -197,6 +197,7 @@ pub fn router(state: AppState, static_dir: PathBuf) -> Router {
         .route("/api/v1/agent/jobs/{id}", get(agent_job))
         .route("/api/v1/agent/jobs/{id}/video", get(agent_video))
         .route("/api/v1/agent/merge", post(agent_merge))
+        .route("/api/v1/agent/jobs/{id}/cancel", post(agent_cancel))
         .with_state(state);
     let spa = tower_http::services::ServeDir::new(static_dir).append_index_html_on_directories(true);
     api.fallback_service(spa)
@@ -308,6 +309,7 @@ async fn dispatch(
         "download_output" => download_output(state, *session_id, &envelope.metadata).await,
         "merge_clips" => merge_clips(state, *session_id, &envelope.metadata).await,
         "flush_all" => flush_mine(state, *session_id).await,
+        "cancel_job" => cancel_job(state, *session_id, &envelope.metadata).await,
         "system_stats" => Ok(system_stats(state).await),
         _ => Err("unknown_action".into()),
     }
@@ -1253,6 +1255,49 @@ async fn download_output(state: &AppState, owner: Uuid, metadata: &Value) -> Res
     })
 }
 
+/// Stop one of the caller's jobs. A queued job is dropped before it reaches the worker; a running one is
+/// interrupted at the worker's next checkpoint, which then frees the GPUs.
+async fn cancel_job(state: &AppState, owner: Uuid, metadata: &Value) -> Result<EnvelopeOut, String> {
+    let job_id = metadata.get("job_id").and_then(|v| v.as_str()).ok_or_else(|| "bad_request".to_string())?;
+    let uuid = Uuid::parse_str(job_id).map_err(|_| "bad_request".to_string())?;
+    let was = {
+        let mut job = state.jobs.get_mut(&uuid).filter(|j| j.owner == owner).ok_or_else(|| "not_found".to_string())?;
+        let was = job.status;
+        if was == JobStatus::Queued {
+            job.status = JobStatus::Aborted;
+            job.stage = "done".into();
+            job.progress = 1.0;
+            job.detail = "aborted".into();
+            job.error = Some("aborted".into());
+        }
+        was
+    };
+    match was {
+        JobStatus::Queued => {
+            let _ = state.progress.send(ProgressEvent {
+                job_id: job_id.to_string(),
+                stage: "done".into(),
+                progress: 1.0,
+                detail: "aborted".into(),
+                done: true,
+                ok: false,
+                gpus: Vec::new(),
+            });
+        }
+        JobStatus::Running => {
+            state.ipc.control("abort", job_id).await.map_err(|_| "cancel_failed".to_string())?;
+        }
+        _ => {}
+    }
+    Ok(EnvelopeOut {
+        ok: true,
+        action: "cancel_job".into(),
+        metadata: json!({ "job_id": job_id, "stopping": was == JobStatus::Running }),
+        files: Vec::new(),
+        error: None,
+    })
+}
+
 /// Abort this session's jobs and zero-wipe its uploads and outputs; other users' work and the shared
 /// model cache are left alone.
 async fn flush_mine(state: &AppState, owner: Uuid) -> Result<EnvelopeOut, String> {
@@ -1828,6 +1873,13 @@ async fn merge_clips(state: &AppState, owner: Uuid, metadata: &Value) -> Result<
     })
 }
 
+async fn agent_cancel(State(state): State<AppState>, headers: HeaderMap, UrlPath(id): UrlPath<String>) -> Response {
+    if let Err(denied) = agent_authorized(&headers) {
+        return denied;
+    }
+    agent_reply(cancel_job(&state, AGENT, &json!({ "job_id": id })).await, StatusCode::OK)
+}
+
 async fn agent_merge(State(state): State<AppState>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     if let Err(denied) = agent_authorized(&headers) {
         return denied;
@@ -1873,6 +1925,20 @@ mod agent_tests {
         assert_eq!(status.metadata["jobs_ahead"], 2);
         assert!(job_status(&state, alice, &json!({ "job_id": ids[1].to_string() })).await.is_err());
         assert!(finished_output(&state, alice, &ids[0].to_string()).is_err());
+    }
+
+    #[tokio::test]
+    async fn cancelling_a_queued_job_drops_it_and_only_its_owner_may_cancel() {
+        let state = test_state().await;
+        let (alice, bob) = (Uuid::new_v4(), Uuid::new_v4());
+        let id = Uuid::new_v4();
+        state.jobs.insert(id, job(alice, JobStatus::Queued, Instant::now(), PathBuf::new()));
+        let body = json!({ "job_id": id.to_string() });
+        assert!(cancel_job(&state, bob, &body).await.is_err());
+        assert!(state.jobs.get(&id).unwrap().status == JobStatus::Queued);
+        let out = cancel_job(&state, alice, &body).await.ok().unwrap();
+        assert_eq!(out.metadata["stopping"], false);
+        assert!(state.jobs.get(&id).unwrap().status == JobStatus::Aborted);
     }
 
     #[tokio::test]

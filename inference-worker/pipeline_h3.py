@@ -339,6 +339,24 @@ def _bind_module_device(obj, device):
                     pass
 
 
+def release_gpu_memory(registry):
+    """After a stopped job, empty the GPUs: cached models move to RAM (so the next job copies them back instead
+    of reading the disk) and PyTorch hands its cached blocks back to the driver."""
+    from memory_manager import _unload_comfy_models
+
+    for slot in ("video_vae", "audio_vae"):
+        vae = registry.loaded_slots[slot]["module"]
+        patcher = getattr(vae, "patcher", None)
+        if patcher is None:
+            continue
+        # Stage 3 binds a VAE to its GPU outright, offload device included. Park it on the CPU but keep its
+        # load_device, so ComfyUI moves it back for the next encode or decode.
+        patcher.offload_device = CPU
+        _unwrap_nn(vae).to(CPU)
+    _unload_comfy_models()
+    registry.trim_all_memory()
+
+
 def _comfy_manages_weights(module):
     from comfy.model_patcher import ModelPatcher
 
