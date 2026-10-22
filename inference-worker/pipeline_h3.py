@@ -11,7 +11,6 @@ import torch.nn.functional as F
 
 from memory_manager import (
     GIB,
-    TIGHT_VRAM_THRESHOLD_MB,
     ResourceLimitExceeded,
     describe_plan,
     device_scope,
@@ -365,19 +364,6 @@ def _apply_stage_shards(module, schedule, report, frac, label):
     return summary
 
 
-def _tighten_video_vae(vae, usable_mb):
-    if usable_mb >= TIGHT_VRAM_THRESHOLD_MB:
-        return
-    chunk = 2 if usable_mb >= 4096 else 1
-    for obj in (vae, getattr(vae, "first_stage_model", None)):
-        if obj is None:
-            continue
-        for name in ("tokens_chunk_size", "decode_chunk_size"):
-            cur = getattr(obj, name, None)
-            if isinstance(cur, int):
-                setattr(obj, name, min(cur, chunk))
-
-
 def _failure_text(exc):
     text = f"{type(exc).__name__}: {exc}".replace("\n", " ")
     return " ".join(text.split())[:180]
@@ -653,16 +639,13 @@ def _render_segment(
     if not healthy:
         video_dev = audio_dev = schedule3.lead_device
         sequential = True
-        usable_mb = 0.0
     elif len(healthy) >= 2:
         video_dev = healthy[0].device
         audio_dev = healthy[1].device
         sequential = False
-        usable_mb = healthy[0].usable_vram_mb
     else:
         video_dev = audio_dev = healthy[0].device
         sequential = True
-        usable_mb = healthy[0].usable_vram_mb
     report(
         "stage3_decode",
         0.90,
@@ -671,7 +654,7 @@ def _render_segment(
     )
     check_host_gate(width, height, frames)
     frames_rgb, waveform = _stage3_decode(
-        video_vae, audio_vae, sampled, video_dev, audio_dev, sequential, usable_mb
+        video_vae, audio_vae, sampled, video_dev, audio_dev, sequential
     )
     checkpoint()
 
@@ -1060,7 +1043,9 @@ def _hook_progress(guider, steps, report, checkpoint):
     guider.sample = sample
 
 
-def _stage3_decode(video_vae, audio_vae, sampled, video_dev=None, audio_dev=None, sequential=True, usable_mb=0.0):
+def _stage3_decode(video_vae, audio_vae, sampled, video_dev=None, audio_dev=None, sequential=True):
+    """The H3 VAE streams decoded chunks to RAM itself; its temporal chunk size is part of the model and must
+    not be shrunk (doing so made decodes on a tight GPU crash or come out black, and stuck to the cached VAE)."""
     from comfy_extras.nodes_lt import LTXVSeparateAVLatent
     from nodes import VAEDecode
 
@@ -1068,7 +1053,6 @@ def _stage3_decode(video_vae, audio_vae, sampled, video_dev=None, audio_dev=None
         video_dev = torch.device("cpu")
     if audio_dev is None:
         audio_dev = video_dev
-    _tighten_video_vae(video_vae, usable_mb)
     _bind_module_device(video_vae, video_dev)
     if not sequential:
         _bind_module_device(audio_vae, audio_dev)
