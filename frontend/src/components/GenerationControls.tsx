@@ -1,5 +1,4 @@
 import type { Dispatch, ReactElement, ReactNode, SetStateAction } from "react";
-import { computeAlignedFrames, computeDimensions } from "../math";
 
 export interface GenerationState {
   diffusionModel: string;
@@ -104,9 +103,9 @@ export function GenerationControls({
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-6 text-zinc-100">
+    <div className="space-y-6 text-zinc-100">
       <div className="flex flex-wrap items-center justify-between border-b border-zinc-800 pb-3 gap-2">
-        <h2 className="text-lg font-semibold tracking-tight">Model & Sampling Controls</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Models & sampling</h2>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -282,19 +281,6 @@ export function GenerationControls({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Aspect Ratio">
-          <select
-            value={state.aspectRatio}
-            onChange={(event) => setState((prev) => ({ ...prev, aspectRatio: event.target.value }))}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm"
-          >
-            {ASPECTS.map((aspect) => (
-              <option key={aspect} value={aspect}>
-                {aspect}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="Output FPS">
           <select
             value={state.fps}
@@ -308,40 +294,6 @@ export function GenerationControls({
             ))}
           </select>
         </Field>
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-zinc-400">Megapixels & Output Size</span>
-            <span className="font-mono text-emerald-400">
-              {state.megapixels.toFixed(1)} MP → {computeDimensions(state.aspectRatio, state.megapixels)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0.2}
-            max={2}
-            step={0.1}
-            value={state.megapixels}
-            onChange={(event) => setState((prev) => ({ ...prev, megapixels: Number(event.target.value) }))}
-            className="w-full accent-emerald-500"
-          />
-        </div>
-        <div>
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-zinc-400">Duration (24fps Causal Alignment)</span>
-            <span className="font-mono text-emerald-400">
-              {state.durationSec.toFixed(1)}s → {computeAlignedFrames(state.durationSec)} frames
-            </span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={15}
-            step={0.5}
-            value={state.durationSec}
-            onChange={(event) => setState((prev) => ({ ...prev, durationSec: Number(event.target.value) }))}
-            className="w-full accent-emerald-500"
-          />
-        </div>
         <Field label="Reference Image Size">
           <select
             value={state.refImageSize}

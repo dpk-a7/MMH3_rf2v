@@ -13,3 +13,11 @@ body {
   background: #09090b;
   color: #f4f4f5;
 }
+
+.pill-select {
+  @apply cursor-pointer appearance-none bg-transparent pr-1 text-xs text-zinc-100 focus:outline-none;
+}
+
+.pill-select option {
+  background: #18181b;
+}

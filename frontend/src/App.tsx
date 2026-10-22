@@ -5,6 +5,7 @@ import {
   type GpuInfo,
   type ProgressEvent,
 } from "./cryptoClient";
+import { Composer, emptySlots, type SlotKind, type SlotState, type Task } from "./components/Composer";
 import {
   EMPTY_MODELS,
   FACTORY_DEFAULTS,
@@ -14,42 +15,34 @@ import {
   type ModelLists,
 } from "./components/GenerationControls";
 import { PanicFlushButton } from "./components/PanicFlushButton";
-import { PromptTagEditor } from "./components/PromptTagEditor";
-import { SequenceEditor } from "./components/SequenceEditor";
-import { KeyframeRack, ReferenceRack, emptySlots, type SlotState } from "./components/ReferenceRack";
 import { computeAlignedFrames, computeSize } from "./math";
 
-const DEFAULT_PROMPT =
-  "Bold comic-book ink style, crisp outlines, dramatic rim light. Use <Picture 1> and <Picture 2> as identity references.";
-
-type Task = "ref2v" | "i2v";
-type SlotKind = "image" | "video" | "audio" | "video-audio" | "keyframe";
-
-const TASKS: { id: Task; label: string; model: RegExp }[] = [
-  { id: "ref2v", label: "Ref2V", model: /omniref/i },
-  { id: "i2v", label: "I2V", model: /fasth3_8step_v2/i },
-];
+// Each task has its own FastH3 checkpoint; switching tabs picks it when it is installed.
+const TASK_MODEL: Record<Task, RegExp> = { ref2v: /omniref/i, i2v: /fasth3_8step_v2/i };
+const TASK_LABEL: Record<Task, string> = { ref2v: "Ref2V", i2v: "I2V" };
 
 const ROLE_CLASS: Record<string, string> = {
-  active_full: "border-emerald-700 bg-emerald-500/15 text-emerald-300",
-  active_tight_partial: "border-amber-700 bg-amber-500/15 text-amber-300",
-  bypassed_busy: "border-zinc-700 bg-zinc-800 text-zinc-400",
+  active_full: "text-emerald-300",
+  active_tight_partial: "text-amber-300",
+  bypassed_busy: "text-zinc-500",
 };
 
 const ROLE_LABEL: Record<string, string> = {
-  active_full: "full",
+  active_full: "free",
   active_tight_partial: "tight",
   bypassed_busy: "busy",
 };
 
+type Clip = { id: string; url: string; prompt: string; meta: string };
+
 export function App() {
   const client = useMemo(() => new SecureClient(), []);
   const urls = useRef(new Set<string>());
-  const insertRef = useRef<(tag: string) => void>(() => undefined);
+  const settingsDialog = useRef<HTMLDialogElement>(null);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState("Securing session");
   const [error, setError] = useState("");
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
+  const [prompt, setPrompt] = useState("");
   const [settings, setSettings] = useState<GenerationState>(FACTORY_DEFAULTS);
   const [models, setModels] = useState<ModelLists>(EMPTY_MODELS);
   const [gpus, setGpus] = useState<GpuInfo[]>([]);
@@ -77,8 +70,10 @@ export function App() {
   const [detail, setDetail] = useState("");
   const [activityLog, setActivityLog] = useState<string[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [clips, setClips] = useState<Clip[]>([]);
   const activeJob = useRef<string | null>(null);
+  const jobInfo = useRef<Record<string, Omit<Clip, "id" | "url">>>({});
+  const pulled = useRef(new Set<string>());
 
   const pushLog = useCallback((entry: string) => {
     setActivityLog((prev) => {
@@ -97,11 +92,8 @@ export function App() {
       URL.revokeObjectURL(url);
     }
     urls.current.clear();
-    setOutputUrl(null);
-  }, []);
-
-  const bindInsert = useCallback((insert: (tag: string) => void) => {
-    insertRef.current = insert;
+    pulled.current.clear();
+    setClips([]);
   }, []);
 
   const refreshModels = useCallback(async () => {
@@ -187,7 +179,7 @@ export function App() {
     if (event.done) {
       setBusy(false);
       if (event.ok) {
-        setStatus("Ready to download");
+        setStatus("Ready");
         pushLog("[100%] Complete — fetching encrypted MP4");
         void pullOutput(event.job_id);
       } else {
@@ -226,9 +218,13 @@ export function App() {
   }, [busy, jobId, client]);
 
   async function pullOutput(id: string) {
+    // Both the WebSocket and the status poll report completion; fetch each output once.
+    if (pulled.current.has(id)) return;
+    pulled.current.add(id);
     try {
       const result = await client.call("download_output", { job_id: id });
       if (!result.ok) {
+        pulled.current.delete(id);
         if (result.error === "not_ready") return;
         setError(result.error || "download_failed");
         return;
@@ -237,22 +233,17 @@ export function App() {
       if (!file) return;
       const copy = new Uint8Array(new ArrayBuffer(file.data.byteLength));
       copy.set(file.data);
-      const blob = new Blob([copy], { type: "video/mp4" });
-      const url = track(URL.createObjectURL(blob));
-      setOutputUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous);
-        return url;
-      });
+      const url = track(URL.createObjectURL(new Blob([copy], { type: "video/mp4" })));
+      const info = jobInfo.current[id] ?? { prompt: "", meta: "" };
+      setClips((prev) => [{ id, url, ...info }, ...prev]);
       setStatus("Playback ready");
     } catch (err) {
+      pulled.current.delete(id);
       setError(err instanceof Error ? err.message : "download_failed");
     }
   }
 
-  async function uploadSlot(
-    kind: "image" | "video" | "audio" | "control",
-    file: File,
-  ): Promise<string> {
+  async function uploadSlot(kind: "image" | "video" | "audio" | "control", file: File): Promise<string> {
     const data = new Uint8Array(await file.arrayBuffer());
     const result: EnvelopeResult = await client.call(
       "upload_media",
@@ -265,11 +256,7 @@ export function App() {
     return result.metadata.media_id;
   }
 
-  function replaceSlot(
-    setter: Dispatch<SetStateAction<SlotState[]>>,
-    index: number,
-    next: SlotState,
-  ) {
+  function replaceSlot(setter: Dispatch<SetStateAction<SlotState[]>>, index: number, next: SlotState) {
     setter((prev) => prev.map((slot, slotIndex) => (slotIndex === index ? next : slot)));
   }
 
@@ -298,12 +285,12 @@ export function App() {
       clearPreview(prev[index]);
       return prev.map((slot, slotIndex) => (slotIndex === index ? blank : slot));
     });
+    if (kind === "video") onClear("video-audio", index);
   }
 
   function selectTask(next: Task) {
     setTask(next);
-    // Each task has its own FastH3 checkpoint; switch to it when it is installed.
-    const model = models.diffussion.find((name) => TASKS.find((t) => t.id === next)?.model.test(name));
+    const model = models.diffussion.find((name) => TASK_MODEL[next].test(name));
     if (model) setSettings((prev) => ({ ...prev, diffusionModel: model, steps: stepsFor(model, prev.mode) }));
   }
 
@@ -324,7 +311,7 @@ export function App() {
 
   function handleResetToDefaults() {
     setSettings({ ...FACTORY_DEFAULTS });
-    setPrompt(DEFAULT_PROMPT);
+    setPrompt("");
     setSegments([]);
     setSeedText("");
   }
@@ -340,6 +327,7 @@ export function App() {
     const [width, height] = computeSize(settings.aspectRatio, settings.megapixels);
     const frames = computeAlignedFrames(settings.durationSec);
     const seed = seedText.trim() === "" ? null : Number(seedText);
+    const scenes = segments.map((text) => text.trim()).filter(Boolean);
     try {
       const result = await client.call("generate_video", {
         models: {
@@ -371,7 +359,7 @@ export function App() {
           end_percent: settings.controlEnd,
         },
         task,
-        segments: segments.map((text) => text.trim()).filter(Boolean),
+        segments: scenes,
         keyframes: task === "i2v" ? { first: keyframes[0].mediaId, last: keyframes[1].mediaId } : {},
         references:
           task === "ref2v"
@@ -391,10 +379,16 @@ export function App() {
         pushLog(`[ERR] ${result.error || "generate_failed"}`);
         return;
       }
-      activeJob.current = result.metadata.job_id;
-      setJobId(result.metadata.job_id);
+      const id = result.metadata.job_id;
+      const size = task === "i2v" && keyframes[0].mediaId ? "first-frame aspect" : `${width}×${height}`;
+      jobInfo.current[id] = {
+        prompt: [prompt, ...scenes].join("  →  "),
+        meta: `${TASK_LABEL[task]} · ${size} · ${settings.durationSec}s${scenes.length ? ` × ${scenes.length + 1} scenes` : ""}`,
+      };
+      activeJob.current = id;
+      setJobId(id);
       setDetail(`Job accepted (${width}×${height} · ${frames} frames)`);
-      pushLog(`[2%] accepted — Job ${result.metadata.job_id.slice(0, 8)} (${width}×${height}, ${frames}f)`);
+      pushLog(`[2%] accepted — Job ${id.slice(0, 8)} (${width}×${height}, ${frames}f)`);
       setStatus(`${width}×${height} · ${frames} frames`);
     } catch (err) {
       setBusy(false);
@@ -446,139 +440,161 @@ export function App() {
     }
   }
 
+  const pct = Math.round(progress * 100);
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight">MiniMax-H3 {task === "ref2v" ? "Ref2VA" : "I2VA"}</h1>
-          <p className="text-xs text-zinc-500 mt-1">
+    <div className="flex h-screen flex-col overflow-x-hidden bg-[#0b0b0e] text-zinc-100">
+      <header className="flex items-center justify-between gap-3 border-b border-white/5 px-5 py-3">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 text-base font-semibold tracking-tight">H3 Studio</h1>
+          <p className="hidden truncate text-xs text-zinc-500 sm:block">
             {status}
             {jobId ? ` · ${jobId.slice(0, 8)}` : ""}
           </p>
-          {ready && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {gpus.length === 0 ? (
-                <span className="text-[11px] text-zinc-500">No GPU reported</span>
-              ) : (
-                gpus.map((gpu) => {
-                  const role = gpu.role || "bypassed_busy";
-                  const pct = Math.round(gpu.allocated_weight_pct ?? 0);
-                  return (
-                    <span
-                      key={gpu.index}
-                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] ${ROLE_CLASS[role] ?? ROLE_CLASS.bypassed_busy}`}
-                    >
-                      GPU{gpu.index} {pct}% {ROLE_LABEL[role] ?? role}
-                    </span>
-                  );
-                })
+        </div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {ready && gpus.length > 0 && (
+            <div className="hidden items-center gap-2 font-mono text-[10px] md:flex">
+              {gpus.map((gpu) => {
+                const role = gpu.role || "bypassed_busy";
+                return (
+                  <span key={gpu.index} className={ROLE_CLASS[role] ?? ROLE_CLASS.bypassed_busy}>
+                    GPU{gpu.index} {ROLE_LABEL[role] ?? role}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => settingsDialog.current?.showModal()}
+            className="whitespace-nowrap rounded-full border border-white/10 px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/5"
+          >
+            ⚙ Settings
+          </button>
+          <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl space-y-5 px-4 py-6">
+          {(busy || (stage && stage !== "done" && !clips.length)) && (
+            <section className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4" aria-live="polite">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{busy ? "Generating" : stage}</span>
+                <span className="font-mono text-xs text-zinc-400">{pct}%</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-full bg-white transition-all duration-300" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-2 truncate text-xs text-zinc-400">{detail || stage}</p>
+              {activityLog.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] text-zinc-500">Activity</summary>
+                  <div className="mt-1 max-h-40 space-y-1 overflow-y-auto font-mono text-[11px] text-zinc-400">
+                    {activityLog.map((line, idx) => (
+                      <div key={`${idx}-${line}`} className="truncate">
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
+            </section>
+          )}
+          {error && (
+            <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+          {clips.length === 0 && !busy ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center text-center">
+              <p className="text-2xl font-semibold tracking-tight text-zinc-200">What do you want to make?</p>
+              <p className="mt-2 max-w-md text-sm text-zinc-500">
+                {task === "i2v"
+                  ? "Add an optional first and last frame, describe the shot and its sound, then press →."
+                  : "Add ingredients (pictures, videos, audio), reference them in the prompt by tag, then press →."}{" "}
+                Use + Extend to continue into more scenes.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {clips.map((clip) => (
+                <figure key={clip.id} className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/60">
+                  <video src={clip.url} controls className="max-h-[420px] w-full bg-black" />
+                  <figcaption className="space-y-1 p-3">
+                    <p className="line-clamp-2 text-sm text-zinc-200">{clip.prompt || "Untitled"}</p>
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                      <span>{clip.meta}</span>
+                      <a href={clip.url} download={`h3_${clip.id.slice(0, 8)}.mp4`} className="text-zinc-300 hover:text-white">
+                        Download
+                      </a>
+                    </div>
+                  </figcaption>
+                </figure>
+              ))}
             </div>
           )}
         </div>
-        <PanicFlushButton busy={flushing || !ready} onFlush={() => void flushAll()} />
-      </header>
-      <nav className="px-4 pt-4 flex gap-2" role="tablist" aria-label="Task">
-        {TASKS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={task === t.id}
-            disabled={busy}
-            onClick={() => selectTask(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold border ${
-              task === t.id
-                ? "bg-blue-600 border-blue-500 text-white"
-                : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white disabled:text-zinc-600"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-      <main className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)_420px] gap-4 p-4">
-        {task === "ref2v" ? (
-          <ReferenceRack
+      </main>
+
+      <div className="px-4 pb-4">
+        <div className="mx-auto max-w-4xl">
+          <Composer
+            task={task}
+            onTask={selectTask}
+            prompt={prompt}
+            setPrompt={setPrompt}
+            segments={segments}
+            setSegments={setSegments}
             images={images}
             videos={videos}
             videoAudios={videoAudios}
             audios={audios}
-            busy={!ready || flushing}
+            keyframes={keyframes}
+            settings={settings}
+            setSettings={setSettings}
+            seedText={seedText}
+            setSeedText={setSeedText}
+            ready={ready && !flushing}
+            busy={busy}
             onPick={(kind, index, file) => void onPick(kind, index, file)}
             onClear={onClear}
-            onInsert={(tag) => insertRef.current(tag)}
+            onGenerate={() => void generate()}
           />
-        ) : (
-          <KeyframeRack
-            keyframes={keyframes}
-            busy={!ready || flushing}
-            onPick={(index, file) => void onPick("keyframe", index, file)}
-            onClear={(index) => onClear("keyframe", index)}
+        </div>
+      </div>
+
+      <dialog
+        ref={settingsDialog}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) settingsDialog.current?.close();
+        }}
+        className="w-[min(56rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-900 p-0 text-zinc-100 backdrop:bg-black/70"
+      >
+        <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
+          <h2 className="text-base font-semibold">Settings</h2>
+          <button
+            type="button"
+            onClick={() => settingsDialog.current?.close()}
+            aria-label="Close settings"
+            className="rounded-full px-2 text-zinc-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="max-h-[75vh] overflow-y-auto p-6">
+          <GenerationControls
+            state={settings}
+            setState={setSettings}
+            availableModels={models}
+            onResetDefaults={handleResetToDefaults}
+            onRefreshModels={() => void refreshModels()}
+            controlName={controlName}
+            onControlFile={(file) => void onControlFile(file)}
           />
-        )}
-        <section className="space-y-4">
-          <PromptTagEditor prompt={prompt} setPrompt={setPrompt} bindInsert={bindInsert} showTags={task === "ref2v"} />
-          <SequenceEditor segments={segments} setSegments={setSegments} durationSec={settings.durationSec} busy={busy} />
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <label className="text-xs text-zinc-400">
-                Seed
-                <input
-                  value={seedText}
-                  onChange={(event) => setSeedText(event.target.value.replace(/[^\d]/g, ""))}
-                  placeholder="random"
-                  className="mt-1 block w-40 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100"
-                />
-              </label>
-              <button
-                type="button"
-                disabled={!ready || busy || flushing}
-                onClick={() => void generate()}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-sm font-semibold"
-              >
-                {busy ? "Generating" : "Generate"}
-              </button>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span className="font-medium text-zinc-300">
-                  {stage ? `${stage}${detail ? ` — ${detail}` : ""}` : "idle"}
-                </span>
-                <span className="font-mono text-emerald-400">{Math.round(progress * 100)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-zinc-950 overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-300"
-                  style={{ width: `${Math.round(progress * 100)}%` }}
-                />
-              </div>
-              {activityLog.length > 0 && (
-                <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-lg p-2.5 max-h-32 overflow-y-auto font-mono text-[11px] text-zinc-400 space-y-1">
-                  {activityLog.map((line, idx) => (
-                    <div key={`${idx}-${line}`} className="truncate">
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            {outputUrl && (
-              <video src={outputUrl} controls className="w-full rounded-lg bg-black max-h-[480px]" />
-            )}
-          </div>
-        </section>
-        <GenerationControls
-          state={settings}
-          setState={setSettings}
-          availableModels={models}
-          onResetDefaults={handleResetToDefaults}
-          onRefreshModels={() => void refreshModels()}
-          controlName={controlName}
-          onControlFile={(file) => void onControlFile(file)}
-        />
-      </main>
+        </div>
+      </dialog>
     </div>
   );
 }
