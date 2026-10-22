@@ -1,3 +1,4 @@
+import contextlib
 import math
 import os
 import subprocess
@@ -803,40 +804,88 @@ def _seg_slice(segments, i, j):
     return out
 
 
-def _chunked_attention(block, x, segments, rope_freqs, shift, scale, gate, spans):
-    """Dense self-attention with q/k/v built chunk by chunk; queries attend all keys, outputs gate into x."""
+def _chunk_qkv(block, x, segments, rope_freqs, shift, scale, i, j):
+    """Normed, rotated q/k/v for rows [i, j) as [1, heads, rows, dim]."""
     import comfy.model_management as mm
     import comfy.quant_ops
-    from comfy.ldm.minimax.model import _mod_gate, _mod_scale_shift
+    from comfy.ldm.minimax.model import _mod_scale_shift
 
     attn = block.attn
-    heads, dim, n = attn.heads, attn.head_dim, x.shape[0]
-    q_all = k_all = v_all = None
+    heads, dim = attn.heads, attn.head_dim
+    h = _mod_scale_shift(block.norm1(x[i:j]), shift, scale, _seg_slice(segments, i, j))
+    q, k, v = attn.qkv_proj(h).split(heads * dim, dim=-1)
+    del h
+    q, k = q.view(1, j - i, heads, dim), k.view(1, j - i, heads, dim)
+    if rope_freqs is not None:
+        qw = mm.cast_to(attn.q_norm.weight, device=x.device)
+        kw = mm.cast_to(attn.k_norm.weight, device=x.device)
+        comfy.quant_ops.ck.rms_rope_split_half_(
+            q, k, rope_freqs[:, i:j], qw, kw, epsilon=attn.q_norm.eps, rot_dim=rope_freqs.shape[-3] * 2)
+    else:
+        q, k = attn.q_norm(q), attn.k_norm(k)
+    return q.transpose(1, 2), k.transpose(1, 2), v.view(1, j - i, heads, dim).transpose(1, 2)
+
+
+def _attend(q, k, v):
+    """Comfy Kitchen INT8 attention (unequal q/k lengths are supported) as the H3 templates use; else PyTorch SDPA."""
+    import comfy_kitchen
+
+    if q.is_cuda and q.dtype in (torch.bfloat16, torch.float16) and comfy_kitchen.int8_attention_is_available(q.device):
+        return comfy_kitchen.int8_attention(q.contiguous(), k, v)
+    return F.scaled_dot_product_attention(q, k, v)
+
+
+def _chunked_attention(block, x, segments, rope_freqs, shift, scale, gate, spans):
+    """Dense self-attention over all keys with only K/V held for the whole sequence; outputs gate into x.
+
+    Each chunk's queries are rebuilt from its rows just before those rows are updated (one extra qkv projection,
+    small next to dense attention), so nothing reads a row after it changed.
+    """
+    from comfy.ldm.minimax.model import _mod_gate
+
+    k_all = v_all = None
     for i, j in spans:
-        h = _mod_scale_shift(block.norm1(x[i:j]), shift, scale, _seg_slice(segments, i, j))
-        q, k, v = attn.qkv_proj(h).split(heads * dim, dim=-1)
-        del h
-        q, k = q.view(1, j - i, heads, dim), k.view(1, j - i, heads, dim)
-        if rope_freqs is not None:
-            qw = mm.cast_to(attn.q_norm.weight, device=x.device)
-            kw = mm.cast_to(attn.k_norm.weight, device=x.device)
-            comfy.quant_ops.ck.rms_rope_split_half_(
-                q, k, rope_freqs[:, i:j], qw, kw, epsilon=attn.q_norm.eps, rot_dim=rope_freqs.shape[-3] * 2)
-        else:
-            q, k = attn.q_norm(q), attn.k_norm(k)
-        if q_all is None:  # the projection's dtype, not the residual stream's
-            q_all, k_all, v_all = (q.new_empty(1, heads, n, dim) for _ in range(3))
-        q_all[0, :, i:j] = q[0].transpose(0, 1)
-        k_all[0, :, i:j] = k[0].transpose(0, 1)
-        v_all[0, :, i:j] = v.view(j - i, heads, dim).transpose(0, 1)
+        _q, k, v = _chunk_qkv(block, x, segments, rope_freqs, shift, scale, i, j)
+        if k_all is None:  # the projection's dtype, not the residual stream's
+            k_all, v_all = (k.new_empty(k.shape[:2] + (x.shape[0], k.shape[-1])) for _ in range(2))
+        k_all[:, :, i:j] = k
+        v_all[:, :, i:j] = v
     for i, j in spans:
-        out = F.scaled_dot_product_attention(q_all[:, :, i:j], k_all, v_all)
-        out = attn.out_proj(out[0].transpose(0, 1).reshape(j - i, heads * dim))
+        q, _k, _v = _chunk_qkv(block, x, segments, rope_freqs, shift, scale, i, j)
+        out = _attend(q, k_all, v_all)
+        out = block.attn.out_proj(out[0].transpose(0, 1).reshape(j - i, -1))
         _mod_gate(x[i:j], gate, out, _seg_slice(segments, i, j))
 
 
+# ponytail: one pinned buffer for the latest residual shape (~2.3 GB at 1080p 15 s), kept for the next block/job.
+_PARKED = {}
+
+
+@contextlib.contextmanager
+def _parked(t):
+    """Hold a CUDA tensor's data in pinned RAM for the duration; its storage is freed and restored in place."""
+    storage = t.untyped_storage()
+    nbytes = storage.nbytes()
+    if not t.is_cuda or nbytes != t.numel() * t.element_size():
+        yield
+        return
+    key = (tuple(t.shape), t.dtype)
+    if key not in _PARKED:
+        _PARKED.clear()
+        _PARKED[key] = torch.empty(t.shape, dtype=t.dtype, pin_memory=True)
+    host = _PARKED[key]
+    host.copy_(t)
+    storage.resize_(0)
+    try:
+        yield
+    finally:
+        storage.resize_(nbytes)
+        t.copy_(host)
+
+
 def _chunked_block(block, x, t_emb, segments, rope_freqs, transformer_options, attention=None):
-    """DiTBlock.forward over token chunks. A VSA `attention` already builds q/k/v in slices, so it gets the full h."""
+    """DiTBlock.forward over token chunks. A VSA `attention` already builds q/k/v in slices, so it gets the full h
+    while the residual stream waits in pinned RAM (the caller still references it, so it cannot simply be freed)."""
     from comfy.ldm.minimax.model import _mod_gate, _mod_scale_shift
 
     n = x.shape[0]
@@ -846,8 +895,9 @@ def _chunked_block(block, x, t_emb, segments, rope_freqs, transformer_options, a
         _chunked_attention(block, x, segments, rope_freqs, shift_msa, scale_msa, gate_msa, spans)
     else:
         h = _mod_scale_shift(block.norm1(x), shift_msa, scale_msa, segments)
-        out = attention(h, rope_freqs=rope_freqs, transformer_options=transformer_options)
-        del h
+        with _parked(x):
+            out = attention(h, rope_freqs=rope_freqs, transformer_options=transformer_options)
+            del h
         x = _mod_gate(x, gate_msa, out, segments)
         del out
     for i, j in spans:
